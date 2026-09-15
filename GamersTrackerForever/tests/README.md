@@ -1,6 +1,6 @@
 # Task 1 harness
 
-`runtime_harness.lua` supplies the small subset of Classic API globals needed to load the scaffold, dispatch its lifecycle hooks, resolve a character key and transfer ecosystem, and exercise `/act status`.
+`runtime_harness.lua` supplies the small subset of Classic API globals needed to load the scaffold, dispatch its lifecycle hooks, resolve a character key and transfer ecosystem, and exercise `/gtf status` plus the `/act` compatibility alias.
 
 Run it with a Lua 5.1-compatible interpreter from the addon directory:
 

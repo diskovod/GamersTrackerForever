@@ -1,9 +1,9 @@
 ## Interface: 11509
-## Title: AltCraft Tracker
+## Title: GamersTrackerForever
 ## Notes: Last-known professions, recipes, and material snapshots for your characters.
-## Author: AltCraft Tracker
+## Author: GamersTrackerForever
 ## Version: 0.1.0
-## SavedVariables: AltCraftTrackerDB
+## SavedVariables: GamersTrackerForeverDB AltCraftTrackerDB
 ## X-Product: Classic Era
 ## X-Data-Version: 1
 

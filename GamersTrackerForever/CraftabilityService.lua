@@ -1,9 +1,9 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local CraftabilityService = {}
 CraftabilityService.__index = CraftabilityService
-ACT.CraftabilityService = CraftabilityService
+GTF.CraftabilityService = CraftabilityService
 
 -- This module deliberately contains no WoW API calls.  Repository records are
 -- plain Lua values, so the calculation functions can be used by both the UI
@@ -230,7 +230,7 @@ local function calculate(recipe, characters, options)
   recipe = type(recipe) == "table" and recipe or {}
   characters = type(characters) == "table" and characters or {}
   local settings = settingsFrom(options.settings)
-  local now = number(options.now, type(ACT.Now) == "function" and ACT.Now() or 0)
+  local now = number(options.now, type(GTF.Now) == "function" and GTF.Now() or 0)
   local keys = sortedCharacterKeys(characters)
   local currentKey = options.currentCharacterKey or options.characterKey or options.currentCharacter
   local current = currentKey and (characters[currentKey] or characters[tostring(currentKey)]) or nil

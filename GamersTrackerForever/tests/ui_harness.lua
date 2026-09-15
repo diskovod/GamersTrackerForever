@@ -6,7 +6,7 @@ local function same(actual, expected, message)
   assert(actual == expected, (message or "value") .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
 end
 
-local repo = AltCraftTracker.Repository:Create({})
+local repo = GamersTrackerForever.Repository:Create({})
 local db = repo:Initialize(nil); db.settings.staleAfterSeconds = 100; db.settings.veryStaleAfterSeconds = 500
 local product = repo:GetProduct("classic_era", true)
 product.characters = {
@@ -20,21 +20,21 @@ product.characters = {
 }
 product.recipes["recipe:1"] = { recipeID = 1, professionID = 171, name = "Test Potion", outputItemID = 900, reagents = { { itemID = 100, quantity = 10, kind = "item" } } }
 product.recipes["recipe:2"] = { recipeID = 2, professionID = 164, name = "Copper Buckle", reagents = {} }
-local service = AltCraftTracker.CraftabilityService:Create(repo, { now = function() return 2000 end })
-local catalog = AltCraftTracker.RecipeCatalog:Create(repo, { productKey = "classic_era", craftabilityService = service })
+local service = GamersTrackerForever.CraftabilityService:Create(repo, { now = function() return 2000 end })
+local catalog = GamersTrackerForever.RecipeCatalog:Create(repo, { productKey = "classic_era", craftabilityService = service })
 
-local characterRows = AltCraftTracker.ViewModels.BuildCharacters(product, { now = 2000, settings = db.settings, expanded = { ana = true } })
+local characterRows = GamersTrackerForever.ViewModels.BuildCharacters(product, { now = 2000, settings = db.settings, expanded = { ana = true } })
 same(characterRows[1].name, "Ana", "characters sort by display name")
 same(characterRows[1].lastSeenLabel, "10s ago", "age formatting")
 same(characterRows[1].bagsFreshness.state, "current", "bag freshness")
 same(characterRows[1].professions[1].recipeScanState, "current", "profession scan state")
 assert(characterRows[1].expanded, "expanded map is projected")
 
-local recipeRows = AltCraftTracker.ViewModels.BuildRecipes(catalog, "classic_era", { search = "potion", profession = "Alchemy" })
+local recipeRows = GamersTrackerForever.ViewModels.BuildRecipes(catalog, "classic_era", { search = "potion", profession = "Alchemy" })
 same(#recipeRows, 1, "recipe search and profession filters")
 same(recipeRows[1].knownLabel, "Ana, Corvin", "known-by label")
 local calc = service:Calculate(product.recipes["recipe:1"], product.characters, { currentCharacterKey = "ana", transferGroup = "realm|A", now = 2000 })
-local materialRows = AltCraftTracker.ViewModels.BuildMaterialRows(product.recipes["recipe:1"], calc, { itemResolver = function() return "Test Reagent", nil, 123 end })
+local materialRows = GamersTrackerForever.ViewModels.BuildMaterialRows(product.recipes["recipe:1"], calc, { itemResolver = function() return "Test Reagent", nil, 123 end })
 same(materialRows[1].required, 10, "material requirement")
 same(materialRows[1].pooledOwned, 24, "pooled material total")
 same(materialRows[1].status, "stale", "stale material status")
@@ -44,10 +44,10 @@ same(materialRows[1].nowStatus, "short", "available-now status")
 same(materialRows[1].afterTransferOwned, 24, "after-transfer pooled total")
 same(materialRows[1].afterTransferShortage, 0, "after-transfer shortage")
 same(materialRows[1].afterTransferStatus, "stale", "after-transfer status")
-same(AltCraftTracker.ViewModels.FormatAvailability(calc.availableNow), "short (0 crafts)", "render-ready now summary")
-same(AltCraftTracker.ViewModels.FormatAvailability(calc.afterTransfer), "stale (2 crafts)", "render-ready transfer summary")
+same(GamersTrackerForever.ViewModels.FormatAvailability(calc.availableNow), "short (0 crafts)", "render-ready now summary")
+same(GamersTrackerForever.ViewModels.FormatAvailability(calc.afterTransfer), "stale (2 crafts)", "render-ready transfer summary")
 same(#materialRows[1].characters, 3, "all tracked characters represented, including isolated")
-local cell, meta = AltCraftTracker.ViewModels.FormatMaterialCell(materialRows[1].characters[1], "bank", { date = function(_, stamp) return "DATE:" .. tostring(stamp) end })
+local cell, meta = GamersTrackerForever.ViewModels.FormatMaterialCell(materialRows[1].characters[1], "bank", { date = function(_, stamp) return "DATE:" .. tostring(stamp) end })
 assert(cell:find("bank", 1, true) and meta.tooltip:find("scanned DATE:", 1, true), "snapshot tooltip includes location and exact time")
 
 -- A compact mocked frame API is sufficient to prove the renderer avoids hard
@@ -70,9 +70,9 @@ local function mockFrame()
   return f
 end
 _G.UIParent = mockFrame(); _G.CreateFrame = function() return mockFrame() end
-local ui = AltCraftTracker.UI:Create({ env = { time = function() return 2000 end }, repository = repo, catalog = catalog, craftabilityService = service, productKey = "classic_era" })
+local ui = GamersTrackerForever.UI:Create({ env = { time = function() return 2000 end }, repository = repo, catalog = catalog, craftabilityService = service, productKey = "classic_era" })
 ui:Initialize()
 assert(ui.frame and ui.initialized and ui.title and ui.characterScroll, "mocked-frame UI initializes")
 ui.tab = "recipes"; ui:Refresh(); assert(ui.recipeScroll and ui.recipeContent, "recipes tab renders")
 
-print("AltCraft Tracker Task 6 UI/view-model harness: PASS")
+print("GamersTrackerForever Task 6 UI/view-model harness: PASS")

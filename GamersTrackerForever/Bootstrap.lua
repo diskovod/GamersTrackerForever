@@ -1,8 +1,8 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 
-function ACT.Now()
+function GTF.Now()
   if type(_G.time) == "function" then
     return _G.time()
   end
@@ -12,12 +12,12 @@ function ACT.Now()
   return 0
 end
 
-function ACT:SetError(message)
+function GTF:SetError(message)
   self.Runtime = self.Runtime or {}
   self.Runtime.lastError = tostring(message)
 end
 
-function ACT:CaptureContext(event, eventLevel)
+function GTF:CaptureContext(event, eventLevel)
   if not self.Api then
     return
   end
@@ -41,10 +41,10 @@ local function countMap(value)
   return count
 end
 
-function ACT:GetDatabaseCounts()
+function GTF:GetDatabaseCounts()
   local tracked, recipes = 0, 0
   local db = self.Repository and type(self.Repository.GetDatabase) == "function"
-    and self.Repository:GetDatabase() or _G.AltCraftTrackerDB
+    and self.Repository:GetDatabase() or _G.GamersTrackerForeverDB
   if type(db) ~= "table" or type(db.products) ~= "table" then
     return tracked, recipes
   end
@@ -63,7 +63,7 @@ function ACT:GetDatabaseCounts()
   return tracked, recipes
 end
 
-function ACT:GetStatusLines()
+function GTF:GetStatusLines()
   local context = self.Runtime and self.Runtime.context
   local client = context and context.client or (self.Api and self.Api:GetClientInfo() or {})
   local capabilities = self.Api and self.Api:GetCapabilities() or {}
@@ -102,14 +102,14 @@ function ACT:GetStatusLines()
   return lines
 end
 
-function ACT:Initialize()
+function GTF:Initialize()
   if self.initialized then
     return true
   end
   self.Runtime = { scans = {}, lastError = nil }
   self.Api, self.product = self.ApiCompat.Detect(_G)
   self.Repository = self.Repository:Create(_G)
-  self.Repository:Initialize(_G.AltCraftTrackerDB, self.Api)
+  self.Repository:Initialize(_G.GamersTrackerForeverDB, self.Api)
   self.Runtime.repositoryDiagnostics = self.Repository:GetDiagnostics()
   self.Dispatcher = self.EventDispatcher:Create(_G)
   self.Commands = self.Commands:Create(_G)
@@ -205,11 +205,11 @@ function ACT:Initialize()
 end
 
 if type(_G.CreateFrame) == "function" then
-  local bootstrap = CreateFrame("Frame", "AltCraftTrackerBootstrap")
+  local bootstrap = CreateFrame("Frame", "GamersTrackerForeverBootstrap")
   bootstrap:RegisterEvent("ADDON_LOADED")
   bootstrap:SetScript("OnEvent", function(_, event, addonName)
-    if event == "ADDON_LOADED" and addonName == ACT.ADDON_NAME then
-      ACT:Initialize()
+    if event == "ADDON_LOADED" and addonName == GTF.ADDON_NAME then
+      GTF:Initialize()
     end
   end)
 end

@@ -1,9 +1,9 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local MinimapButton = {}
 MinimapButton.__index = MinimapButton
-ACT.MinimapButton = MinimapButton
+GTF.MinimapButton = MinimapButton
 
 local function enabled(self)
   if type(self.isEnabled) == "function" then local ok, value = pcall(self.isEnabled); if ok then return value ~= false end end
@@ -27,12 +27,12 @@ function MinimapButton:Initialize(options)
   if options.angle ~= nil then self.angle = tonumber(options.angle) or self.angle end
   if self.initialized then self:Refresh() return self end
   if not enabled(self) or type(CreateFrame) ~= "function" or not Minimap then return self end
-  local button = CreateFrame("Button", "AltCraftTrackerMinimapButton", Minimap)
+  local button = CreateFrame("Button", "GamersTrackerForeverMinimapButton", Minimap)
   button:SetSize(32, 32); button:SetFrameStrata("MEDIUM"); button:SetFrameLevel(8)
   button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
   local icon = button:CreateTexture(nil, "BACKGROUND"); icon:SetTexture("Interface\\Icons\\INV_Misc_EngGizmos_19"); icon:SetSize(20, 20); icon:SetPoint("CENTER")
-  button:SetScript("OnClick", function() if type(self.onClick) == "function" then self.onClick() elseif ACT.UI and type(ACT.UI.Toggle) == "function" then ACT.UI:Toggle() end end)
-  button:SetScript("OnEnter", function() if GameTooltip and GameTooltip.SetOwner then GameTooltip:SetOwner(button, "ANCHOR_LEFT"); GameTooltip:AddLine("AltCraft Tracker"); GameTooltip:AddLine("Click to open"); GameTooltip:Show() end end)
+  button:SetScript("OnClick", function() if type(self.onClick) == "function" then self.onClick() elseif GTF.UI and type(GTF.UI.Toggle) == "function" then GTF.UI:Toggle() end end)
+  button:SetScript("OnEnter", function() if GameTooltip and GameTooltip.SetOwner then GameTooltip:SetOwner(button, "ANCHOR_LEFT"); GameTooltip:AddLine("GamersTrackerForever"); GameTooltip:AddLine("Click to open"); GameTooltip:Show() end end)
   button:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
   button:RegisterForDrag("LeftButton")
   button:SetScript("OnDragStart", function() self.dragging = true end)

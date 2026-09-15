@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="GAMERSTRACKERFOREVER_TOGGLE" header="GAMERSTRACKERFOREVER">
+    GTF_UI_TOGGLE()
+  </Binding>
+</Bindings>

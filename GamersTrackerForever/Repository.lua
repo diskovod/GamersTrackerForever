@@ -1,9 +1,9 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local Repository = {}
 Repository.__index = Repository
-ACT.Repository = Repository
+GTF.Repository = Repository
 
 local function copy(value, seen)
   if type(value) ~= "table" then
@@ -524,7 +524,7 @@ end
 function Repository:Migrate(root)
   local diagnostics = self.diagnostics
   local version = tonumber(root.schemaVersion) or 0
-  if version > (ACT.SCHEMA_VERSION or 1) then
+  if version > (GTF.SCHEMA_VERSION or 1) then
     self.unsupportedSchema = true
     self.readOnly = true
     diagnostics.errors[#diagnostics.errors + 1] = "unsupported schema version " .. tostring(version)
@@ -535,7 +535,7 @@ function Repository:Migrate(root)
     version = 1
   end
   if self.migrations then
-    for nextVersion = version + 1, ACT.SCHEMA_VERSION do
+    for nextVersion = version + 1, GTF.SCHEMA_VERSION do
       local migration = self.migrations[nextVersion]
       if migration then
         local ok, migrated = pcall(migration, root)
@@ -547,7 +547,7 @@ function Repository:Migrate(root)
       end
     end
   end
-  root.schemaVersion = ACT.SCHEMA_VERSION or 1
+  root.schemaVersion = GTF.SCHEMA_VERSION or 1
   return root
 end
 
@@ -558,7 +558,15 @@ function Repository:Initialize(savedVariables, api)
   self.api = api or self.api
   local root = savedVariables
   if root == nil then
-    root = self.env.AltCraftTrackerDB
+    root = self.env.GamersTrackerForeverDB
+    if root == nil and type(self.env.AltCraftTrackerDB) == "table" then
+      -- Preserve data from releases that used the old SavedVariables name.
+      -- Copy instead of aliasing so later writes to the active database do
+      -- not mutate or reserialize the legacy table through a shared reference.
+      root = copy(self.env.AltCraftTrackerDB)
+      self.diagnostics.migrated = true
+      self.diagnostics.legacySavedVariables = true
+    end
   end
   if type(root) ~= "table" then
     if root ~= nil then
@@ -566,11 +574,12 @@ function Repository:Initialize(savedVariables, api)
     end
     root = Repository.DefaultDatabase()
   else
+    local originalRoot = root
     root = self:Migrate(root)
     if not root then
       if self.unsupportedSchema then
-        self.db = savedVariables or self.env.AltCraftTrackerDB
-        self.env.AltCraftTrackerDB = self.db
+        self.db = originalRoot
+        self.env.GamersTrackerForeverDB = self.db
         return self.db
       end
       root = Repository.DefaultDatabase()
@@ -596,7 +605,7 @@ function Repository:Initialize(savedVariables, api)
   end
   root.products = products
   self.db = root
-  self.env.AltCraftTrackerDB = root
+  self.env.GamersTrackerForeverDB = root
   return root
 end
 
@@ -692,7 +701,7 @@ function Repository:CommitCharacterContext(context, seenAt)
     return false, "context does not contain product and character keys"
   end
   context = copy(context)
-  context.lastSeenAt = seenAt or context.lastSeenAt or (type(ACT.Now) == "function" and ACT.Now() or 0)
+  context.lastSeenAt = seenAt or context.lastSeenAt or (type(GTF.Now) == "function" and GTF.Now() or 0)
   local character, err = self:UpsertCharacter(productKey, characterKey, context)
   return character ~= nil, err
 end

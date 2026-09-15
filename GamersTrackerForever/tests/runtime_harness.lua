@@ -43,40 +43,41 @@ for _, file in ipairs(files) do
   chunk()
 end
 
-assert(AltCraftTracker:Initialize())
-assert(AltCraftTracker.product == "classic_era")
-assert(AltCraftTracker.Api:GetCurrentContext().key == "Player-1-0001")
-assert(AltCraftTracker.Api:GetTransferGroup() == "classic_era|test-realm|alliance")
+assert(GamersTrackerForever:Initialize())
+assert(GamersTrackerForever.product == "classic_era")
+assert(GamersTrackerForever.Api:GetCurrentContext().key == "Player-1-0001")
+assert(GamersTrackerForever.Api:GetTransferGroup() == "classic_era|test-realm|alliance")
 assert(registeredEvents.PLAYER_LOGIN and registeredEvents.PLAYER_LOGOUT)
-assert(SlashCmdList.ALTCRAFTTRACKER)
+assert(SlashCmdList.GAMERSTRACKERFOREVER)
+assert(SLASH_GAMERSTRACKERFOREVER1 == "/gtf" and SLASH_GAMERSTRACKERFOREVER2 == "/act")
 local firstSubscriber, secondSubscriber = false, false
-AltCraftTracker.Dispatcher:On("HARNESS_EVENT", function(value)
+GamersTrackerForever.Dispatcher:On("HARNESS_EVENT", function(value)
   assert(value == "payload")
   error("expected harness failure")
 end)
-AltCraftTracker.Dispatcher:On("HARNESS_EVENT", function(value)
+GamersTrackerForever.Dispatcher:On("HARNESS_EVENT", function(value)
   assert(value == "payload")
   secondSubscriber = true
 end)
-AltCraftTracker.Dispatcher:On("HARNESS_EVENT", function()
+GamersTrackerForever.Dispatcher:On("HARNESS_EVENT", function()
   firstSubscriber = true
 end)
-AltCraftTracker.Dispatcher:Dispatch("HARNESS_EVENT", "payload")
+GamersTrackerForever.Dispatcher:Dispatch("HARNESS_EVENT", "payload")
 assert(firstSubscriber and secondSubscriber)
-assert(AltCraftTracker.Runtime.lastError:match("expected harness failure"))
+assert(GamersTrackerForever.Runtime.lastError:match("expected harness failure"))
 for _, frame in ipairs(frames) do
   if frame.OnEvent then
     frame.OnEvent(frame, "PLAYER_LOGIN")
   end
 end
-assert(AltCraftTracker.Runtime.context.level == 42)
+assert(GamersTrackerForever.Runtime.context.level == 42)
 for _, frame in ipairs(frames) do
   if frame.OnEvent then
     frame.OnEvent(frame, "PLAYER_LEVEL_UP", 43)
   end
 end
-assert(AltCraftTracker.Runtime.context.level == 43)
-AltCraftTrackerDB = {
+assert(GamersTrackerForever.Runtime.context.level == 43)
+GamersTrackerForeverDB = {
   products = {
     classic_era = {
       recipes = { copper = {} },
@@ -88,9 +89,9 @@ AltCraftTrackerDB = {
     },
   },
 }
-local trackedCount, recipeCount = AltCraftTracker:GetDatabaseCounts()
+local trackedCount, recipeCount = GamersTrackerForever:GetDatabaseCounts()
 assert(trackedCount == 1 and recipeCount == 1)
-SlashCmdList.ALTCRAFTTRACKER("status")
+SlashCmdList.GAMERSTRACKERFOREVER("status")
 assert(#messages > 0)
 assert(messages[1]:match("version 0.1.0"))
 local foundUnsupported = false
@@ -100,4 +101,4 @@ for _, message in ipairs(messages) do
   end
 end
 assert(foundUnsupported)
-print("AltCraft Tracker Task 1 runtime harness: PASS")
+print("GamersTrackerForever Task 1 runtime harness: PASS")

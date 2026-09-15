@@ -1,9 +1,9 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local InventoryScanner = {}
 InventoryScanner.__index = InventoryScanner
-ACT.InventoryScanner = InventoryScanner
+GTF.InventoryScanner = InventoryScanner
 
 local function now(env, clock)
   if type(clock) == "function" then
@@ -15,8 +15,8 @@ local function now(env, clock)
   if env and type(env.GetServerTime) == "function" then
     return tonumber(env.GetServerTime()) or 0
   end
-  if type(ACT.Now) == "function" then
-    return tonumber(ACT.Now()) or 0
+  if type(GTF.Now) == "function" then
+    return tonumber(GTF.Now()) or 0
   end
   return 0
 end

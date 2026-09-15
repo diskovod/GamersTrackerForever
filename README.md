@@ -1,7 +1,7 @@
 # GamersTrackerForever
 
-GamersTrackerForever currently contains the **AltCraft Tracker** Classic Era
-MVP: an account-wide, last-known tracker for character levels, professions,
+GamersTrackerForever is a Classic Era MVP: an account-wide, last-known tracker
+for character levels, professions,
 learned recipes, bags, banks, and cross-character crafting materials.
 
 The addon is informational. It does not move items, automate protected actions,
@@ -10,18 +10,18 @@ client can be inspected and the compatibility gate in the specification passes.
 
 ## Install
 
-Copy the [`AltCraftTracker`](AltCraftTracker) directory to:
+Copy the [`GamersTrackerForever`](GamersTrackerForever) directory to:
 
 ```text
-World of Warcraft\_classic_era_\Interface\AddOns\AltCraftTracker\
+World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\
 ```
 
-Enable **AltCraft Tracker** on the character-selection AddOns screen, then use
-`/act`. See [installation and usage](docs/installation.md) for details.
+Enable **GamersTrackerForever** on the character-selection AddOns screen, then use
+`/gtf` (with `/act` retained as a compatibility alias). See [installation and usage](docs/installation.md) for details.
 
 ## Repository layout
 
-- [`AltCraftTracker/`](AltCraftTracker) — addon source and fixture harnesses.
+- [`GamersTrackerForever/`](GamersTrackerForever) — addon source and fixture harnesses.
 - [`docs/specification.md`](docs/specification.md) — finalized product and
   implementation specification.
 - [`docs/feasibility-research.md`](docs/feasibility-research.md) — WoW API and

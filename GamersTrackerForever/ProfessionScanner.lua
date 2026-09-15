@@ -4,12 +4,12 @@
 -- trade-skill source, or repository failure therefore leaves the previous
 -- learned set and product recipe definitions untouched.
 
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local Scanner = {}
 Scanner.__index = Scanner
-ACT.ProfessionScanner = Scanner
+GTF.ProfessionScanner = Scanner
 
 local function number(value, fallback)
   local result = tonumber(value)
@@ -42,8 +42,8 @@ local function clock(self)
   if type(self.now) == "function" then
     return number(self.now(), 0)
   end
-  if type(ACT.Now) == "function" then
-    return number(ACT.Now(), 0)
+  if type(GTF.Now) == "function" then
+    return number(GTF.Now(), 0)
   end
   return os.time()
 end
@@ -83,7 +83,7 @@ end
 
 function Scanner:Create(env, api, repository, options)
   -- Permit both Scanner:Create(...) and Scanner.Create({ ... }) forms.
-  if self ~= Scanner and type(self) == "table" and self ~= ACT.ProfessionScanner then
+  if self ~= Scanner and type(self) == "table" and self ~= GTF.ProfessionScanner then
     options = repository
     repository = api
     api = env
@@ -104,7 +104,7 @@ function Scanner:Create(env, api, repository, options)
     onResult = options.onResult,
     schedule = options.schedule,
     debounceSeconds = number(options.debounceSeconds, 0.05),
-    dataVersion = options.dataVersion or (ACT.DATA_VERSION or 1),
+    dataVersion = options.dataVersion or (GTF.DATA_VERSION or 1),
     initialized = false,
     pendingTradeScan = false,
     tradeScanScheduled = false,
@@ -141,8 +141,8 @@ end
 
 function Scanner:_setError(message)
   self.lastError = message and tostring(message) or nil
-  if self.lastError and type(ACT.SetError) == "function" then
-    ACT:SetError(self.lastError)
+  if self.lastError and type(GTF.SetError) == "function" then
+    GTF:SetError(self.lastError)
   end
 end
 
@@ -190,7 +190,7 @@ function Scanner:MarkUnsupported()
 end
 
 function Scanner:SetDataVersion(version)
-  version = version or (ACT.DATA_VERSION or 1)
+  version = version or (GTF.DATA_VERSION or 1)
   if self.dataVersion ~= nil and self.dataVersion ~= version then
     self:MarkStale()
   end

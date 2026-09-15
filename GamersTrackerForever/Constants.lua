@@ -1,19 +1,19 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 
-ACT.ADDON_NAME = "AltCraftTracker"
-ACT.ADDON_VERSION = "0.1.0"
-ACT.SCHEMA_VERSION = 1
-ACT.DATA_VERSION = 1
-ACT.PRODUCT_CLASSIC_ERA = "classic_era"
+GTF.ADDON_NAME = "GamersTrackerForever"
+GTF.ADDON_VERSION = "0.1.0"
+GTF.SCHEMA_VERSION = 1
+GTF.DATA_VERSION = 1
+GTF.PRODUCT_CLASSIC_ERA = "classic_era"
 -- Blizzard resolves these globals when Bindings.xml is loaded. Keep the
 -- machine-readable names stable while presenting readable key-bind labels.
-ACT.BINDING_HEADER = "ALTCRAFTTRACKER"
-ACT.BINDING_TOGGLE = "ALTCRAFTTRACKER_TOGGLE"
-BINDING_HEADER_ALTCRAFTTRACKER = "AltCraft Tracker"
-BINDING_NAME_ALTCRAFTTRACKER_TOGGLE = "Toggle AltCraft Tracker"
-ACT.CAPABILITY = {
+GTF.BINDING_HEADER = "GAMERSTRACKERFOREVER"
+GTF.BINDING_TOGGLE = "GAMERSTRACKERFOREVER_TOGGLE"
+BINDING_HEADER_GAMERSTRACKERFOREVER = "GamersTrackerForever"
+BINDING_NAME_GAMERSTRACKERFOREVER_TOGGLE = "Toggle GamersTrackerForever"
+GTF.CAPABILITY = {
   PRODUCT_DETECTION = "product_detection",
   CHARACTER_IDENTITY = "character_identity",
   CHARACTER_LEVEL = "character_level",
@@ -27,7 +27,7 @@ ACT.CAPABILITY = {
   SLASH_COMMANDS = "slash_commands",
 }
 
-ACT.EVENTS = {
+GTF.EVENTS = {
   "ADDON_LOADED",
   "PLAYER_LOGIN",
   "PLAYER_ENTERING_WORLD",

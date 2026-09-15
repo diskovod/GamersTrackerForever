@@ -11,7 +11,7 @@ local function same(actual, expected, message)
   assert(actual == expected, (message or "value") .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual))
 end
 
-local repo = AltCraftTracker.Repository:Create({})
+local repo = GamersTrackerForever.Repository:Create({})
 local db = repo:Initialize(nil)
 db.settings.staleAfterSeconds = 100
 db.settings.veryStaleAfterSeconds = 500
@@ -51,7 +51,7 @@ corvin.professions.alchemy.learnedRecipes["item:900"] = true
 isolated.professions.alchemy.learnedRecipes["recipe:500"] = true
 untracked.professions.alchemy.learnedRecipes["recipe:500"] = true
 
-local service = AltCraftTracker.CraftabilityService:Create(repo, { now = function() return 2000 end })
+local service = GamersTrackerForever.CraftabilityService:Create(repo, { now = function() return 2000 end })
 local result = service:Calculate(recipe, product.characters, { currentCharacterKey = "ana", transferGroup = "realm|alliance" })
 same(result.reagents[1].availableNow.status, "short", "known bag short is confirmed despite unscanned bank")
 same(result.reagents[1].availableNow.owned, 4, "current known bag total")
@@ -135,7 +135,7 @@ same(unscannedResult.availableNow.owned, 0, "unscanned bags contribute no now co
 same(unscannedResult.afterTransfer.owned, 99, "bank-only after-transfer count")
 
 -- Catalog queries are deterministic, deduplicated, and support the UI filters.
-local catalog = AltCraftTracker.RecipeCatalog:Create(repo, { productKey = "classic_era", craftabilityService = service })
+local catalog = GamersTrackerForever.RecipeCatalog:Create(repo, { productKey = "classic_era", craftabilityService = service })
 local all = catalog:ListRecipes({ productKey = "classic_era" })
 same(#all, 1, "deduplicated catalog")
 same(all[1].knownCount, 3, "tracked known-by list includes isolated tracked character")
@@ -147,4 +147,4 @@ same(#catalog:ListRecipes({ productKey = "classic_era", search = "transmute", pr
 local craftable = catalog:ListRecipes({ productKey = "classic_era", calculate = true, currentCharacterKey = "ana", transferGroup = "realm|alliance", craftability = "craftable" })
 same(#craftable, 1, "craftability filter includes stale-but-usable result")
 
-print("AltCraft Tracker Task 5 catalog/craftability harness: PASS")
+print("GamersTrackerForever Task 5 catalog/craftability harness: PASS")

@@ -48,10 +48,10 @@ local fixture = {
   GetTradeSkillReagentItemLink = function(index, reagent) return rows[index].reagents[reagent].item end,
 }
 
-local api = AltCraftTracker.ApiCompat.CreateClassic(fixture)
-local repo = AltCraftTracker.Repository:Create({})
+local api = GamersTrackerForever.ApiCompat.CreateClassic(fixture)
+local repo = GamersTrackerForever.Repository:Create({})
 repo:Initialize(nil, api)
-local scanner = AltCraftTracker.ProfessionScanner:Create(fixture, api, repo, {
+local scanner = GamersTrackerForever.ProfessionScanner:Create(fixture, api, repo, {
   now = function() return 1000 end,
   schedule = function(_, callback) scheduledCallback = callback end,
 })
@@ -110,4 +110,4 @@ assert(api:ParseItemID("|cffabc123|Hitem:9988:1:2:3|h[odd text]|h|r") == 9988)
 assert(api:ParseRecipeID("|Htrade:777:0:0:0|h[x]|h") == 777)
 assert(api:ParseRecipeID("|Henchant:888:0:0:0|h[x]|h") == 888)
 
-print("AltCraft Tracker Task 4 profession scanner harness: PASS")
+print("GamersTrackerForever Task 4 profession scanner harness: PASS")

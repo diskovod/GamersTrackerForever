@@ -1,8 +1,8 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local ApiCompat = {}
-ACT.ApiCompat = ApiCompat
+GTF.ApiCompat = ApiCompat
 
 local function normalize(value)
   if value == nil or value == "" then
@@ -34,7 +34,7 @@ function Classic:ReadClientInfo()
   end
   return {
     productID = self.env.WOW_PROJECT_ID or self.env.WOW_PROJECT_CLASSIC_ERA or 0,
-    product = self.productKey or ACT.PRODUCT_CLASSIC_ERA,
+    product = self.productKey or GTF.PRODUCT_CLASSIC_ERA,
     version = safeString(version),
     build = safeString(build),
     date = safeString(date),
@@ -48,7 +48,7 @@ function Classic:GetClientInfo()
 end
 
 function Classic:GetProduct()
-  return self.productKey or ACT.PRODUCT_CLASSIC_ERA
+  return self.productKey or GTF.PRODUCT_CLASSIC_ERA
 end
 
 function Classic:GetCurrentIdentity()
@@ -96,7 +96,7 @@ function Classic:GetCharacterKey(identity)
     return identity.guid
   end
   return table.concat({
-    ACT.PRODUCT_CLASSIC_ERA,
+    GTF.PRODUCT_CLASSIC_ERA,
     normalize(identity.realm),
     normalize(identity.displayName),
     normalize(identity.faction),
@@ -106,7 +106,7 @@ end
 function Classic:GetTransferGroup(identity)
   identity = identity or self:GetCurrentIdentity()
   return table.concat({
-    ACT.PRODUCT_CLASSIC_ERA,
+    GTF.PRODUCT_CLASSIC_ERA,
     normalize(identity.realm),
     normalize(identity.faction),
   }, "|")
@@ -138,22 +138,22 @@ function Classic:GetCapabilities()
     and (hasFunction(env, "GetContainerItemInfo") or hasFunction(env, "GetContainerItemLink"))
 
   return {
-    [ACT.CAPABILITY.PRODUCT_DETECTION] = hasFunction(env, "GetBuildInfo") or env.WOW_PROJECT_ID ~= nil,
-    [ACT.CAPABILITY.CHARACTER_IDENTITY] = hasFunction(env, "UnitName") or hasFunction(env, "UnitFullName"),
-    [ACT.CAPABILITY.CHARACTER_LEVEL] = hasFunction(env, "UnitLevel"),
-    [ACT.CAPABILITY.PROFESSION_ENUMERATION] = hasFunction(env, "GetProfessions") and hasFunction(env, "GetProfessionInfo"),
-    [ACT.CAPABILITY.LEARNED_RECIPE_SCAN] = hasFunction(env, "GetTradeSkillLine") and hasFunction(env, "GetNumTradeSkills") and hasFunction(env, "GetTradeSkillInfo"),
-    [ACT.CAPABILITY.BAG_INVENTORY_SCAN] = hasContainer or hasLegacyContainer,
-    [ACT.CAPABILITY.BANK_INVENTORY_SCAN] = hasContainer or hasLegacyContainer,
-    [ACT.CAPABILITY.SAVED_VARIABLES] = true,
-    [ACT.CAPABILITY.TRANSFER_GROUP] = hasFunction(env, "UnitFactionGroup") and (hasFunction(env, "GetRealmName") or hasFunction(env, "UnitFullName")),
-    [ACT.CAPABILITY.EVENT_DISPATCH] = true,
-    [ACT.CAPABILITY.SLASH_COMMANDS] = true,
+    [GTF.CAPABILITY.PRODUCT_DETECTION] = hasFunction(env, "GetBuildInfo") or env.WOW_PROJECT_ID ~= nil,
+    [GTF.CAPABILITY.CHARACTER_IDENTITY] = hasFunction(env, "UnitName") or hasFunction(env, "UnitFullName"),
+    [GTF.CAPABILITY.CHARACTER_LEVEL] = hasFunction(env, "UnitLevel"),
+    [GTF.CAPABILITY.PROFESSION_ENUMERATION] = hasFunction(env, "GetProfessions") and hasFunction(env, "GetProfessionInfo"),
+    [GTF.CAPABILITY.LEARNED_RECIPE_SCAN] = hasFunction(env, "GetTradeSkillLine") and hasFunction(env, "GetNumTradeSkills") and hasFunction(env, "GetTradeSkillInfo"),
+    [GTF.CAPABILITY.BAG_INVENTORY_SCAN] = hasContainer or hasLegacyContainer,
+    [GTF.CAPABILITY.BANK_INVENTORY_SCAN] = hasContainer or hasLegacyContainer,
+    [GTF.CAPABILITY.SAVED_VARIABLES] = true,
+    [GTF.CAPABILITY.TRANSFER_GROUP] = hasFunction(env, "UnitFactionGroup") and (hasFunction(env, "GetRealmName") or hasFunction(env, "UnitFullName")),
+    [GTF.CAPABILITY.EVENT_DISPATCH] = true,
+    [GTF.CAPABILITY.SLASH_COMMANDS] = true,
   }
 end
 
 function ApiCompat.CreateClassic(env, productKey)
-  local adapter = setmetatable({ env = env or _G, productKey = productKey or ACT.PRODUCT_CLASSIC_ERA }, Classic)
+  local adapter = setmetatable({ env = env or _G, productKey = productKey or GTF.PRODUCT_CLASSIC_ERA }, Classic)
   adapter.clientInfo = adapter:ReadClientInfo()
   return adapter
 end
@@ -164,7 +164,7 @@ function ApiCompat.Detect(env)
   local classicID = env.WOW_PROJECT_CLASSIC_ERA or env.WOW_PROJECT_CLASSIC
   local isClassic = projectID == nil or (classicID ~= nil and projectID == classicID) or projectID == 2
   if isClassic then
-    return ApiCompat.CreateClassic(env), ACT.PRODUCT_CLASSIC_ERA
+    return ApiCompat.CreateClassic(env), GTF.PRODUCT_CLASSIC_ERA
   end
   -- The Classic .toc is not a Forever adapter. Keep the probe useful while
   -- making an unvalidated product visible instead of silently claiming support.
@@ -172,4 +172,4 @@ function ApiCompat.Detect(env)
   return ApiCompat.CreateClassic(env, productKey), productKey
 end
 
-ACT.ApiCompat.Classic = Classic
+GTF.ApiCompat.Classic = Classic

@@ -1,12 +1,12 @@
-# AltCraft Tracker — Classic Era in-client acceptance checklist
+# GamersTrackerForever — Classic Era in-client acceptance checklist
 
 Use on a disposable/test account in the Classic Era client. Do not run this checklist on a Forever beta client; Task 8 remains beta-gated.
 
 ## Load and persistence
 
-- [ ] Install the folder at `World of Warcraft\_classic_era_\Interface\AddOns\AltCraftTracker\`.
-- [ ] Log in with character A and confirm `/act` opens the window; `/act` again toggles it closed.
-- [ ] Confirm `/act status` reports Classic adapter, interface/build, current key, and scan timestamps.
+- [ ] Install the folder at `World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`.
+- [ ] Log in with character A and confirm `/gtf` opens the window; `/gtf` again toggles it closed. Confirm `/act` remains a working alias.
+- [ ] Confirm `/gtf status` reports Classic adapter, interface/build, current key, and scan timestamps.
 - [ ] Track A, `/reload`, and confirm tracking and window geometry survive.
 - [ ] Log in with character B on the same realm; confirm A and B remain separate records.
 - [ ] Log in with a same-named character on another realm; confirm no collision.
@@ -37,6 +37,6 @@ Use on a disposable/test account in the Classic Era client. Do not run this chec
 ## Controls and diagnostics
 
 - [ ] Drag/resize the window, `/reload`, and confirm geometry is retained and clamped to safe minimums.
-- [ ] Use `/act minimap off`, `/act minimap on`, and `/act minimap toggle`; confirm the setting and button visibility change.
-- [ ] Use the key binding `Toggle AltCraft Tracker` and confirm it opens/toggles the same window.
+- [ ] Use `/gtf minimap off`, `/gtf minimap on`, and `/gtf minimap toggle`; confirm the setting and button visibility change. Repeat one command through `/act`.
+- [ ] Use the key binding `Toggle GamersTrackerForever` and confirm it opens/toggles the same window.
 - [ ] Confirm no protected action, item movement, external request, quest tracking, or forced reload occurs.

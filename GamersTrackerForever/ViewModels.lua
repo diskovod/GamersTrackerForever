@@ -1,10 +1,10 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
 -- UI-facing projections.  This file intentionally has no WoW frame/API calls;
 -- fixtures and the in-game renderer can consume the same deterministic rows.
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local ViewModels = {}
-ACT.ViewModels = ViewModels
+GTF.ViewModels = ViewModels
 
 local function text(value, fallback)
   if value == nil or value == "" then return fallback or "" end

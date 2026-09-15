@@ -1,9 +1,9 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local Dispatcher = {}
 Dispatcher.__index = Dispatcher
-ACT.EventDispatcher = Dispatcher
+GTF.EventDispatcher = Dispatcher
 
 function Dispatcher:Create(env)
   local dispatcher = setmetatable({ env = env or _G, handlers = {}, lastEvents = {}, frame = nil }, Dispatcher)
@@ -20,13 +20,13 @@ function Dispatcher:On(event, handler)
 end
 
 function Dispatcher:Dispatch(event, ...)
-  self.lastEvents[event] = ACT.Now()
+  self.lastEvents[event] = GTF.Now()
   local handlers = self.handlers[event]
   if handlers then
     for _, handler in ipairs(handlers) do
       local ok, err = pcall(handler, ...)
-      if not ok and ACT.SetError then
-        ACT:SetError(err)
+      if not ok and GTF.SetError then
+        GTF:SetError(err)
       end
     end
   end
@@ -40,8 +40,8 @@ function Dispatcher:Initialize()
   if type(createFrame) ~= "function" then
     return self
   end
-  self.frame = createFrame("Frame", "AltCraftTrackerEventFrame")
-  for _, event in ipairs(ACT.EVENTS) do
+  self.frame = createFrame("Frame", "GamersTrackerForeverEventFrame")
+  for _, event in ipairs(GTF.EVENTS) do
     if self.frame.RegisterEvent then
       self.frame:RegisterEvent(event)
     end

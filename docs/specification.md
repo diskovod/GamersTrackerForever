@@ -1,4 +1,4 @@
-# AltCraft Tracker — Final Addon Specification
+# GamersTrackerForever — Final Addon Specification
 
 **Version:** 1.0
 
@@ -12,7 +12,7 @@
 
 ## 1. Product definition
 
-AltCraft Tracker is a compact World of Warcraft addon that records the last-known state of selected characters and answers two questions:
+GamersTrackerForever is a compact World of Warcraft addon that records the last-known state of selected characters and answers two questions:
 
 1. Which professions and recipes does each tracked character have?
 2. For a selected recipe, which tracked characters hold the required materials, and is the pooled amount sufficient?
@@ -281,7 +281,7 @@ The thresholds shall be configurable. Stale values may contribute to a pooled to
 
 ### FR-10: Diagnostics
 
-`/act status` shall display:
+`/gtf status` shall display (and `/act status` shall remain an alias):
 
 - addon version and database schema version;
 - product, client version, build, and interface number;
@@ -300,8 +300,12 @@ Diagnostics must not expose private account paths or unrelated SavedVariables.
 The `.toc` file shall declare:
 
 ```text
-## SavedVariables: AltCraftTrackerDB
+## SavedVariables: GamersTrackerForeverDB AltCraftTrackerDB
 ```
+
+`GamersTrackerForeverDB` is the only active database. `AltCraftTrackerDB` is
+listed solely so WoW can load an older installation for the one-time migration
+into the new global; addon code does not modify it after migration.
 
 The addon shall modify a Lua table in memory. WoW owns disk serialization.
 
@@ -310,7 +314,7 @@ The ten-minute reconciliation timer is not a disk-save guarantee. The addon shal
 ### 7.2 Database shape
 
 ```lua
-AltCraftTrackerDB = {
+GamersTrackerForeverDB = {
   schemaVersion = 1,
   settings = {
     staleAfterSeconds = 86400,
@@ -421,7 +425,7 @@ Use Blizzard-style frames, item buttons, icons, tooltips, scroll containers, and
 
 ### 9.1 Opening the addon
 
-- Slash command: `/act`.
+- Slash command: `/gtf`; `/act` remains a compatibility alias.
 - Optional minimap button, enabled by default.
 - Optional key binding.
 - Window is movable, resizable, clamped to screen, and remembers its geometry.
@@ -592,7 +596,7 @@ Deliverables:
 - slash commands;
 - product/build detection;
 - initial Classic `ApiCompat` interface;
-- `/act status` capability output;
+- `/gtf status` capability output (with `/act status` compatibility coverage);
 - minimal mock/runtime test harness.
 
 Depends on: none.

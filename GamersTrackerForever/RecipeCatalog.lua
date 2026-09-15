@@ -1,9 +1,9 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local RecipeCatalog = {}
 RecipeCatalog.__index = RecipeCatalog
-ACT.RecipeCatalog = RecipeCatalog
+GTF.RecipeCatalog = RecipeCatalog
 
 local function lower(value)
   return tostring(value or ""):lower()

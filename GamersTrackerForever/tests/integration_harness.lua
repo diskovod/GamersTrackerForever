@@ -49,35 +49,35 @@ local files = {
 }
 for _, file in ipairs(files) do local chunk, err = loadfile(file); assert(chunk, err); chunk() end
 
-assert(AltCraftTracker:Initialize())
-assert(AltCraftTracker.Api and AltCraftTracker.Repository and AltCraftTracker.Characters)
-assert(AltCraftTracker.Professions and AltCraftTracker.Inventory and AltCraftTracker.Catalog)
-assert(AltCraftTracker.Repository.db.settings.minimapButton == true)
-assert(AltCraftTracker.Repository.db.settings.uiGeometry.width == 610)
+assert(GamersTrackerForever:Initialize())
+assert(GamersTrackerForever.Api and GamersTrackerForever.Repository and GamersTrackerForever.Characters)
+assert(GamersTrackerForever.Professions and GamersTrackerForever.Inventory and GamersTrackerForever.Catalog)
+assert(GamersTrackerForever.Repository.db.settings.minimapButton == true)
+assert(GamersTrackerForever.Repository.db.settings.uiGeometry.width == 610)
 
-AltCraftTracker.Dispatcher:Dispatch("PLAYER_LOGIN")
+GamersTrackerForever.Dispatcher:Dispatch("PLAYER_LOGIN")
 local firstBagCalls = calls.bags
-AltCraftTracker.Dispatcher:Dispatch("PLAYER_ENTERING_WORLD")
+GamersTrackerForever.Dispatcher:Dispatch("PLAYER_ENTERING_WORLD")
 assert(calls.bags == firstBagCalls, "login/entering-world duplicated destructive bag scan")
-local character = AltCraftTracker.Repository:GetCharacter("classic_era", "Player-1-0001", false)
+local character = GamersTrackerForever.Repository:GetCharacter("classic_era", "Player-1-0001", false)
 assert(character and character.level == 42 and character.inventory.bags[2447] == 4)
 assert(character.professions["profession:171"].rank == 225)
 
-AltCraftTracker.Dispatcher:Dispatch("BANKFRAME_OPENED")
-AltCraftTracker.Dispatcher:Dispatch("BANKFRAME_CLOSED")
+GamersTrackerForever.Dispatcher:Dispatch("BANKFRAME_OPENED")
+GamersTrackerForever.Dispatcher:Dispatch("BANKFRAME_CLOSED")
 assert(character.inventory.bank[2447] == 2 and character.inventory.bankScannedAt == 1000)
-AltCraftTracker.Dispatcher:Dispatch("PLAYER_LOGOUT")
+GamersTrackerForever.Dispatcher:Dispatch("PLAYER_LOGOUT")
 assert(character.inventory.bank[2447] == 2, "logout erased last-known bank data")
 
-SlashCmdList.ALTCRAFTTRACKER("minimap off")
-assert(AltCraftTracker.Repository.db.settings.minimapButton == false)
-SlashCmdList.ALTCRAFTTRACKER("minimap on")
-assert(AltCraftTracker.Repository.db.settings.minimapButton == true)
-SlashCmdList.ALTCRAFTTRACKER("status")
+SlashCmdList.GAMERSTRACKERFOREVER("minimap off")
+assert(GamersTrackerForever.Repository.db.settings.minimapButton == false)
+SlashCmdList.GAMERSTRACKERFOREVER("minimap on")
+assert(GamersTrackerForever.Repository.db.settings.minimapButton == true)
+SlashCmdList.GAMERSTRACKERFOREVER("status")
 assert(#messages > 0)
 
 local future = { schemaVersion = 99, settings = { minimapButton = false }, products = {} }
-local futureRepo = AltCraftTracker.Repository:Create({})
+local futureRepo = GamersTrackerForever.Repository:Create({})
 futureRepo:Initialize(future)
 assert(futureRepo:IsReadOnly() and future.schemaVersion == 99, "future schema was downgraded")
 
@@ -85,12 +85,12 @@ local geometryRoot = { schemaVersion = 1, settings = {
   minimapButton = false, minimapAngle = 135,
   uiGeometry = { point = "TOPLEFT", relative = "TOPLEFT", x = 17, y = -23, width = 700, height = 500 },
 }, products = {} }
-local geometryRepo = AltCraftTracker.Repository:Create({})
+local geometryRepo = GamersTrackerForever.Repository:Create({})
 geometryRepo:Initialize(geometryRoot)
 assert(geometryRepo.db.settings.minimapButton == false and geometryRepo.db.settings.minimapAngle == 135)
 assert(geometryRepo.db.settings.uiGeometry.point == "TOPLEFT" and geometryRepo.db.settings.uiGeometry.width == 700)
-local reloadedRepo = AltCraftTracker.Repository:Create({})
+local reloadedRepo = GamersTrackerForever.Repository:Create({})
 reloadedRepo:Initialize(geometryRepo.db)
 assert(reloadedRepo.db.settings.uiGeometry.height == 500, "UI geometry was lost during normalization/reload")
 
-print("AltCraft Tracker Task 7 integration harness: PASS")
+print("GamersTrackerForever Task 7 integration harness: PASS")

@@ -48,12 +48,12 @@ function env.C_Container.GetContainerItemInfo(id, slot) return (namespaced[id] o
 local timerQueue = {}
 function env.C_Timer.After(_, callback) timerQueue[#timerQueue + 1] = callback end
 
-local api = AltCraftTracker.ApiCompat.CreateClassic(env)
-local repository = AltCraftTracker.Repository:Create({})
+local api = GamersTrackerForever.ApiCompat.CreateClassic(env)
+local repository = GamersTrackerForever.Repository:Create({})
 repository:Initialize(nil, api)
-local scanner = AltCraftTracker.InventoryScanner:Create(env, api, repository, { clock = function() return clock end })
+local scanner = GamersTrackerForever.InventoryScanner:Create(env, api, repository, { clock = function() return clock end })
 
-local service = AltCraftTracker.CharacterService:Create(env, api, repository, scanner, { clock = function() return clock end })
+local service = GamersTrackerForever.CharacterService:Create(env, api, repository, scanner, { clock = function() return clock end })
 local login = service:OnLogin()
 assert(login.success and login.context.level == 42)
 local character = repository:GetCharacter("classic_era", "Player-1-0001")
@@ -108,9 +108,9 @@ local legacyEnv = {
   end,
   GetContainerItemID = function(id, slot) if id == 0 and slot == 1 then return 400 end end,
 }
-local legacyApi = AltCraftTracker.ApiCompat.CreateClassic(legacyEnv)
-local legacyScanner = AltCraftTracker.InventoryScanner:Create(legacyEnv, legacyApi, nil)
+local legacyApi = GamersTrackerForever.ApiCompat.CreateClassic(legacyEnv)
+local legacyScanner = GamersTrackerForever.InventoryScanner:Create(legacyEnv, legacyApi, nil)
 local legacyTotals = legacyScanner:ScanContainers({ 0 })
 assert(legacyTotals[400] == 5)
 
-print("AltCraft Tracker Task 3 character/inventory harness: PASS")
+print("GamersTrackerForever Task 3 character/inventory harness: PASS")

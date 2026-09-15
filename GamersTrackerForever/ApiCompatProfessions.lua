@@ -4,13 +4,13 @@
 -- the Classic adapter from ApiCompat.lua so the scanner can also be exercised
 -- against small API fixtures outside of the game client.
 
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
-local ApiCompat = ACT.ApiCompat or {}
+local GTF = GamersTrackerForever
+local ApiCompat = GTF.ApiCompat or {}
 local Classic = ApiCompat.Classic or {}
 ApiCompat.Classic = Classic
-ACT.ApiCompat = ApiCompat
+GTF.ApiCompat = ApiCompat
 
 local function fn(env, name)
   return type(env) == "table" and type(env[name]) == "function"
@@ -361,9 +361,9 @@ function Classic:GetCapabilities()
   local professionEnumeration = (fn(env, "GetProfessions") and fn(env, "GetProfessionInfo"))
     or (fn(env, "GetNumSkillLines") and fn(env, "GetSkillLineInfo"))
   local recipeScan = fn(env, "GetTradeSkillLine") and fn(env, "GetNumTradeSkills") and fn(env, "GetTradeSkillInfo")
-  capabilities[ACT.CAPABILITY and ACT.CAPABILITY.PROFESSION_ENUMERATION or "profession_enumeration"] = professionEnumeration
-  capabilities[ACT.CAPABILITY and ACT.CAPABILITY.LEARNED_RECIPE_SCAN or "learned_recipe_scan"] = recipeScan
+  capabilities[GTF.CAPABILITY and GTF.CAPABILITY.PROFESSION_ENUMERATION or "profession_enumeration"] = professionEnumeration
+  capabilities[GTF.CAPABILITY and GTF.CAPABILITY.LEARNED_RECIPE_SCAN or "learned_recipe_scan"] = recipeScan
   return capabilities
 end
 
-ACT.ApiCompat.Classic = Classic
+GTF.ApiCompat.Classic = Classic

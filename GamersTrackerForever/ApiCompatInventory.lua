@@ -1,9 +1,9 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
-ACT.ApiCompat = ACT.ApiCompat or {}
-local Classic = ACT.ApiCompat.Classic or {}
-ACT.ApiCompat.Classic = Classic
+local GTF = GamersTrackerForever
+GTF.ApiCompat = GTF.ApiCompat or {}
+local Classic = GTF.ApiCompat.Classic or {}
+GTF.ApiCompat.Classic = Classic
 
 -- Inventory APIs changed shape between Classic-era client builds.  The
 -- scanner only consumes these small, normalized methods; all API probing is

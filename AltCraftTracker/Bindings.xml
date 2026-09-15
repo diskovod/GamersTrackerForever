@@ -1,5 +1,0 @@
-<Bindings>
-  <Binding name="ALTCRAFTTRACKER_TOGGLE" header="ALTCRAFTTRACKER">
-    ACT_UI_TOGGLE()
-  </Binding>
-</Bindings>

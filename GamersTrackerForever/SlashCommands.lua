@@ -1,9 +1,9 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local Commands = {}
 Commands.__index = Commands
-ACT.Commands = Commands
+GTF.Commands = Commands
 
 function Commands:Create(env)
   return setmetatable({ env = env or _G }, Commands)
@@ -12,12 +12,12 @@ end
 function Commands:Print(message)
   local frame = self.env.DEFAULT_CHAT_FRAME
   if frame and type(frame.AddMessage) == "function" then
-    frame:AddMessage("|cff33ff99AltCraft Tracker|r " .. tostring(message))
+    frame:AddMessage("|cff33ff99GamersTrackerForever|r " .. tostring(message))
   end
 end
 
 function Commands:Status()
-  for _, line in ipairs(ACT:GetStatusLines()) do
+  for _, line in ipairs(GTF:GetStatusLines()) do
     self:Print(line)
   end
 end
@@ -25,7 +25,7 @@ end
 function Commands:Handle(message)
   local command = tostring(message or ""):lower():match("^%s*(.-)%s*$")
   if command == "" or command == "toggle" or command == "open" then
-    if ACT.UI and type(ACT.UI.Toggle) == "function" then ACT.UI:Toggle() end
+    if GTF.UI and type(GTF.UI.Toggle) == "function" then GTF.UI:Toggle() end
     return
   end
   if command == "status" then
@@ -35,7 +35,7 @@ function Commands:Handle(message)
   local minimap = command:match("^minimap%s*(.*)$")
   if minimap then
     minimap = minimap:match("^%s*(.-)%s*$")
-    local button = ACT.MinimapButton
+    local button = GTF.MinimapButton
     if not button or type(button.SetEnabled) ~= "function" then
       self:Print("minimap button is unavailable")
       return
@@ -43,17 +43,18 @@ function Commands:Handle(message)
     if minimap == "on" then button:SetEnabled(true)
     elseif minimap == "off" then button:SetEnabled(false)
     elseif minimap == "" or minimap == "toggle" then button:ToggleEnabled()
-    else self:Print("usage: /act minimap on|off|toggle"); return end
+    else self:Print("usage: /gtf minimap on|off|toggle (alias: /act)"); return end
     self:Print("minimap button " .. (button:IsEnabled() and "enabled" or "disabled"))
     return
   end
-  self:Print("usage: /act [status|toggle|minimap on|off|toggle]")
+  self:Print("usage: /gtf [status|toggle|minimap on|off|toggle] (alias: /act)")
 end
 
 function Commands:Initialize()
-  self.env.SLASH_ALTCRAFTTRACKER1 = "/act"
+  self.env.SLASH_GAMERSTRACKERFOREVER1 = "/gtf"
+  self.env.SLASH_GAMERSTRACKERFOREVER2 = "/act"
   self.env.SlashCmdList = self.env.SlashCmdList or {}
-  self.env.SlashCmdList.ALTCRAFTTRACKER = function(message)
+  self.env.SlashCmdList.GAMERSTRACKERFOREVER = function(message)
     self:Handle(message)
   end
 end

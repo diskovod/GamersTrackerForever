@@ -1,14 +1,14 @@
-AltCraftTracker = AltCraftTracker or {}
+GamersTrackerForever = GamersTrackerForever or {}
 
-local ACT = AltCraftTracker
+local GTF = GamersTrackerForever
 local UI = {}
 UI.__index = UI
-ACT.UI = UI
+GTF.UI = UI
 
--- Bindings.xml calls this stable global; Task 7 may replace ACT.UI with the
+-- Bindings.xml calls this stable global; Task 7 may replace GTF.UI with the
 -- configured instance after repository/service initialization.
-function ACT_UI_TOGGLE()
-  if ACT.UI and type(ACT.UI.Toggle) == "function" then ACT.UI:Toggle() end
+function GTF_UI_TOGGLE()
+  if GTF.UI and type(GTF.UI.Toggle) == "function" then GTF.UI:Toggle() end
 end
 
 local function safeCall(object, method, ...)
@@ -25,7 +25,7 @@ end
 
 local function now(env)
   if env and type(env.time) == "function" then return tonumber(env.time()) or 0 end
-  if type(ACT.Now) == "function" then return tonumber(ACT.Now()) or 0 end
+  if type(GTF.Now) == "function" then return tonumber(GTF.Now()) or 0 end
   return 0
 end
 
@@ -36,7 +36,7 @@ local function getProduct(self)
     local context = self.api:GetCurrentContext() or {}
     key = context.productKey or context.product
   end
-  key = key or ACT.product or ACT.PRODUCT_CLASSIC_ERA
+  key = key or GTF.product or GTF.PRODUCT_CLASSIC_ERA
   local product
   if self.repository and type(self.repository.GetProduct) == "function" then product = self.repository:GetProduct(key, false)
   elseif self.repository and self.repository.db then product = self.repository.db.products and self.repository.db.products[key] end
@@ -122,8 +122,8 @@ function UI:Initialize(dependencies)
   if self.initialized then self:Refresh() return self end
   if type(CreateFrame) ~= "function" then return self end
   local frame
-  local ok, value = pcall(CreateFrame, "Frame", "AltCraftTrackerFrame", UIParent, "BackdropTemplate")
-  frame = ok and value or CreateFrame("Frame", "AltCraftTrackerFrame", UIParent)
+  local ok, value = pcall(CreateFrame, "Frame", "GamersTrackerForeverFrame", UIParent, "BackdropTemplate")
+  frame = ok and value or CreateFrame("Frame", "GamersTrackerForeverFrame", UIParent)
   self.frame = frame
   frame:SetSize(610, 470)
   frame:SetFrameStrata("DIALOG")
@@ -201,7 +201,7 @@ function UI:Toggle() if self.frame and self.frame:IsShown() then self:Hide() els
 function UI:Refresh()
   if not self.frame then return end
   local productKey, product = getProduct(self)
-  self.title:SetText("AltCraft Tracker — " .. text(productKey, "unknown product"))
+  self.title:SetText("GamersTrackerForever — " .. text(productKey, "unknown product"))
   self.characterScroll:SetShown(self.tab == "characters"); self.recipeControls:SetShown(self.tab == "recipes"); self.recipeScroll:SetShown(self.tab == "recipes")
   if self.tab == "characters" then self:RefreshCharacters(productKey, product) else self:RefreshRecipes(productKey, product) end
 end
@@ -209,7 +209,7 @@ end
 function UI:RefreshCharacters(productKey, product)
   hideRows(self.rows); self.rows = {}
   local settings = self.repository and self.repository.db and self.repository.db.settings or {}
-  local rows = ACT.ViewModels.BuildCharacters(product, { now = now(self.env), settings = settings, productKey = productKey, expanded = self.expandedCharacters })
+  local rows = GTF.ViewModels.BuildCharacters(product, { now = now(self.env), settings = settings, productKey = productKey, expanded = self.expandedCharacters })
   local y, contentHeight = -4, 0
   for _, model in ipairs(rows) do
     local row = CreateFrame("Button", nil, self.characterContent); row:SetPoint("TOPLEFT", 2, y); row:SetSize(550, 26); self.rows[#self.rows + 1] = row
@@ -227,7 +227,7 @@ function UI:RefreshCharacters(productKey, product)
       local details = CreateFrame("Frame", nil, self.characterContent); details:SetPoint("TOPLEFT", 16, y); details:SetSize(520, 100); self.rows[#self.rows + 1] = details
       local identity = "Identity: " .. model.name .. (model.realm and " @ " .. text(model.realm) or "") .. " | " .. text(model.faction, "faction unknown")
       label(details, "GameFontHighlightSmall", "TOPLEFT", details, 0, 0, 510, 18):SetText(identity)
-      label(details, "GameFontHighlightSmall", "TOPLEFT", details, 0, -18, 510, 18):SetText("Transfer: " .. text(model.transferGroup, "unknown") .. " | last seen: " .. ACT.ViewModels.FormatTimestamp(model.lastSeenAt, self.env))
+      label(details, "GameFontHighlightSmall", "TOPLEFT", details, 0, -18, 510, 18):SetText("Transfer: " .. text(model.transferGroup, "unknown") .. " | last seen: " .. GTF.ViewModels.FormatTimestamp(model.lastSeenAt, self.env))
       local scan = "Bags: " .. model.bagsFreshness.label .. " | Bank: " .. model.bankFreshness.label
       label(details, "GameFontHighlightSmall", "TOPLEFT", details, 0, -36, 510, 18):SetText(scan)
       local py = -56
@@ -258,7 +258,7 @@ function UI:ConfirmForget(productKey, characterKey, displayName)
     self.expandedCharacters[characterKey] = nil; self:Refresh()
   end
   if type(StaticPopupDialogs) == "table" and type(StaticPopup_Show) == "function" then
-    local name = "ALTCRAFTTRACKER_FORGET"
+    local name = "GAMERSTRACKERFOREVER_FORGET"
     StaticPopupDialogs[name] = { text = "Forget " .. text(displayName, characterKey) .. " and all snapshots?", button1 = YES or "Yes", button2 = NO or "No", hideOnEscape = true, timeout = 0, whileDead = true, OnAccept = forget }
     StaticPopup_Show(name)
   end
@@ -272,7 +272,7 @@ function UI:RefreshRecipes(productKey, product)
   query.currentCharacterKey = context and (context.key or context.characterKey)
   query.transferGroup = transferText ~= "" and transferText or (context and context.transferGroup)
   query.transferOnly = transferText ~= ""
-  local rows = ACT.ViewModels.BuildRecipes(self.catalog, productKey, query)
+  local rows = GTF.ViewModels.BuildRecipes(self.catalog, productKey, query)
   local y, contentHeight = -4, 0
   for _, model in ipairs(rows) do
     local recipe = model.recipe or {}; local expanded = self.expandedRecipes[model.key] == true
@@ -281,17 +281,17 @@ function UI:RefreshRecipes(productKey, product)
     row:SetScript("OnClick", function() self.expandedRecipes[model.key] = not expanded; self:Refresh() end)
     y = y - 30; contentHeight = contentHeight + 30
     if expanded then
-      local calc = model.craftability or ACT.ViewModels.GetRecipeCalculation(self.craftability, recipe, product, query)
+      local calc = model.craftability or GTF.ViewModels.GetRecipeCalculation(self.craftability, recipe, product, query)
       local detail = CreateFrame("Frame", nil, self.recipeContent); detail:SetPoint("TOPLEFT", 16, y); detail:SetSize(520, 40); self.recipeRows[#self.recipeRows + 1] = detail
       local nowSummary = "unavailable (0 crafts)"
       local transferSummary = "unavailable (0 crafts)"
       if calc then
         local nowResult, transferResult = calc.availableNow or {}, calc.afterTransfer or {}
-        nowSummary = ACT.ViewModels.FormatAvailability(nowResult)
-        transferSummary = ACT.ViewModels.FormatAvailability(transferResult)
+        nowSummary = GTF.ViewModels.FormatAvailability(nowResult)
+        transferSummary = GTF.ViewModels.FormatAvailability(transferResult)
       end
       label(detail, "GameFontHighlightSmall", "TOPLEFT", detail, 0, 0, 510, 18):SetText("Known by " .. text(model.knownLabel, "none") .. " | Now: " .. nowSummary .. " | After transfer: " .. transferSummary)
-      local materialRows = ACT.ViewModels.BuildMaterialRows(recipe, calc or {}, { now = query.now, itemResolver = function(itemID) if self.env and type(self.env.GetItemInfo) == "function" then return self.env.GetItemInfo(itemID) end end })
+      local materialRows = GTF.ViewModels.BuildMaterialRows(recipe, calc or {}, { now = query.now, itemResolver = function(itemID) if self.env and type(self.env.GetItemInfo) == "function" then return self.env.GetItemInfo(itemID) end end })
       local my = -20
       for _, material in ipairs(materialRows) do
         local materialLine = label(detail, "GameFontNormalSmall", "TOPLEFT", detail, 0, my, 510, 18)
@@ -304,8 +304,8 @@ function UI:RefreshRecipes(productKey, product)
         for _, characterRow in ipairs(material.characters or {}) do
           local cell = CreateFrame("Button", nil, detail); cell:SetPoint("TOPLEFT", 18, my); cell:SetSize(492, 16)
           local cellText = label(cell, "GameFontDisableSmall", "LEFT", cell, 0, 0, 492, 16)
-          local bags, bagsMeta = ACT.ViewModels.FormatMaterialCell(characterRow, "bags", self.env)
-          local bank, bankMeta = ACT.ViewModels.FormatMaterialCell(characterRow, "bank", self.env)
+          local bags, bagsMeta = GTF.ViewModels.FormatMaterialCell(characterRow, "bags", self.env)
+          local bank, bankMeta = GTF.ViewModels.FormatMaterialCell(characterRow, "bank", self.env)
           cellText:SetText("  " .. text(characterRow.displayName, characterRow.characterKey) .. ": " .. bags .. ", " .. bank)
           -- FontStrings do not expose mouse scripts on every Classic build;
           -- attach the exact snapshot text only when the widget supports it.

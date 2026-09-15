@@ -12,7 +12,7 @@ for _, file in ipairs(files) do
 end
 
 local env = {}
-local repo = AltCraftTracker.Repository:Create(env)
+local repo = GamersTrackerForever.Repository:Create(env)
 
 -- Missing SavedVariables creates the exact version-1 root defaults.
 local db = repo:Initialize(nil)
@@ -20,7 +20,18 @@ assert(db.schemaVersion == 1)
 assert(db.settings.staleAfterSeconds == 86400)
 assert(db.settings.veryStaleAfterSeconds == 604800)
 assert(type(db.products) == "table" and next(db.products) == nil)
-assert(env.AltCraftTrackerDB == db)
+assert(env.GamersTrackerForeverDB == db)
+
+-- A pre-rename database is copied to the new SavedVariables global once.
+local legacyRoot = { products = { classic_era = { characters = { legacy = { level = 17 } } } } }
+local legacyEnv = { AltCraftTrackerDB = legacyRoot }
+local legacyRepo = GamersTrackerForever.Repository:Create(legacyEnv)
+local legacyMigrated = legacyRepo:Initialize()
+assert(legacyMigrated.products.classic_era.characters.legacy.level == 17)
+assert(legacyEnv.GamersTrackerForeverDB == legacyMigrated)
+assert(legacyMigrated ~= legacyRoot)
+assert(legacyEnv.AltCraftTrackerDB == legacyRoot)
+assert(legacyRepo:GetDiagnostics().legacySavedVariables == true)
 
 -- Product/character keys are supplied by the adapter/current context.
 assert(repo:CommitCharacterContext({
@@ -119,7 +130,7 @@ local mixed = {
     partial = { characters = { bad = "not a character", okay = { level = 12 } } },
   },
 }
-local recovered = AltCraftTracker.Repository:Create({}):Initialize(mixed)
+local recovered = GamersTrackerForever.Repository:Create({}):Initialize(mixed)
 assert(recovered.schemaVersion == 1 and recovered.settings.veryStaleAfterSeconds == 604800)
 assert(recovered.products.healthy.characters.keep.level == 10)
 assert(recovered.products.healthy.recipes.good.recipeID == 7)
@@ -127,18 +138,18 @@ assert(recovered.products.corruptProduct == nil)
 assert(recovered.products.partial.characters.bad == nil)
 assert(recovered.products.partial.characters.okay.level == 12)
 assert(#repo:GetDiagnostics().quarantined == 0) -- previous repository remains unaffected
-local recoveryRepo = AltCraftTracker.Repository:Create({})
+local recoveryRepo = GamersTrackerForever.Repository:Create({})
 recoveryRepo:Initialize(mixed)
 assert(#recoveryRepo:GetDiagnostics().quarantined > 0)
 
 -- A corrupt root is recoverable without leaving a malformed SavedVariables table.
-local rootRepo = AltCraftTracker.Repository:Create({})
+local rootRepo = GamersTrackerForever.Repository:Create({})
 local reset = rootRepo:Initialize("corrupt root")
 assert(reset.schemaVersion == 1 and type(reset.products) == "table")
 assert(#rootRepo:GetDiagnostics().errors > 0)
 
 -- Versioned migration accepts a missing schema version and retains records.
-local migrationRepo = AltCraftTracker.Repository:Create({})
+local migrationRepo = GamersTrackerForever.Repository:Create({})
 local migrated = migrationRepo:Initialize({ products = { classic_era = { characters = { c = { level = 8 } } } } })
 assert(migrated.schemaVersion == 1)
 assert(migrated.products.classic_era.characters.c.level == 8)
@@ -193,14 +204,14 @@ assert(reloadedRecipe.reagents[1].soulbound == true and reloadedRecipe.reagents[
 
 -- A newer schema is retained verbatim and exposed read-only for downgrade safety.
 local futureRoot = { schemaVersion = 99, sentinel = "future-data", products = { future = "opaque" } }
-local futureEnv = { AltCraftTrackerDB = futureRoot }
-local futureRepo = AltCraftTracker.Repository:Create(futureEnv)
+local futureEnv = { GamersTrackerForeverDB = futureRoot }
+local futureRepo = GamersTrackerForever.Repository:Create(futureEnv)
 assert(futureRepo:Initialize() == futureRoot)
-assert(futureRepo:IsReadOnly() and futureEnv.AltCraftTrackerDB == futureRoot)
+assert(futureRepo:IsReadOnly() and futureEnv.GamersTrackerForeverDB == futureRoot)
 assert(futureRoot.schemaVersion == 99 and futureRoot.sentinel == "future-data")
 assert(not futureRepo:CommitCharacterContext({ productKey = "classic_era", characterKey = "future" }))
 assert(not futureRepo:CommitRecipeSnapshot("classic_era", "future", { complete = true, recipeID = 1 }))
 assert(not migrationRepo:CommitRecipeSnapshot("classic_era", "r1", { complete = false, recipeID = 999 }))
 assert(migrated.products.classic_era.recipes.r1.recipeID == 11)
 
-print("AltCraft Tracker Task 2 repository harness: PASS")
+print("GamersTrackerForever Task 2 repository harness: PASS")
