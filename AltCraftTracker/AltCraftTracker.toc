@@ -1,0 +1,26 @@
+## Interface: 11509
+## Title: AltCraft Tracker
+## Notes: Last-known professions, recipes, and material snapshots for your characters.
+## Author: AltCraft Tracker
+## Version: 0.1.0
+## SavedVariables: AltCraftTrackerDB
+## X-Product: Classic Era
+## X-Data-Version: 1
+
+Constants.lua
+ApiCompat.lua
+ApiCompatInventory.lua
+ApiCompatProfessions.lua
+EventDispatcher.lua
+Repository.lua
+CharacterService.lua
+InventoryScanner.lua
+ProfessionScanner.lua
+CraftabilityService.lua
+RecipeCatalog.lua
+ViewModels.lua
+UI.lua
+MinimapButton.lua
+SlashCommands.lua
+Bootstrap.lua
+Bindings.xml
