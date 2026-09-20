@@ -74,6 +74,10 @@ The core must therefore be client-neutral. All version-sensitive calls belong be
 - Indicate stale, missing, and never-scanned data.
 - Store everything locally in account-wide SavedVariables.
 - Provide a compact, expandable Blizzard-style UI.
+- Use a persistent two-pane native UI: a left character selector and a larger
+  right detail/recipes pane. The selector exposes a `Track up to` limit from 1
+  through 10 (default 3), persists the selected character, and never silently
+  untracks existing characters when a limit is reached.
 
 ### 4.2 Out of scope
 
@@ -202,6 +206,12 @@ Bank inventory:
 
 Store totals separately for bags and bank. Container/slot detail is not required after aggregation unless needed for diagnostics.
 
+A zero total of readable container slots during early login/world entry is an
+incomplete scan, not an empty inventory. Preserve the previous valid bags and
+retry after approximately one and three seconds, with a bounded retry count.
+An actually empty inventory is valid when the client reports one or more
+readable slots.
+
 ### FR-6: Recipe catalog
 
 The MVP catalog shall contain recipes learned by at least one tracked character and captured from the game client.
@@ -295,6 +305,12 @@ Diagnostics must not expose private account paths or unrelated SavedVariables.
 
 ## 7. Persistence specification
 
+The WoW client owns SavedVariables serialization. Addon code only updates the
+in-memory `GamersTrackerForeverDB` table; it cannot write arbitrary files or
+make arbitrary HTTP requests. Future server synchronization must use an
+explicit export after SavedVariables flush and a companion desktop uploader,
+or another approved bridge.
+
 ### 7.1 Storage mechanism
 
 The `.toc` file shall declare:
@@ -319,6 +335,8 @@ GamersTrackerForeverDB = {
   settings = {
     staleAfterSeconds = 86400,
     veryStaleAfterSeconds = 604800,
+    maxTrackedCharacters = 3,
+    selectedCharacterKey = nil,
   },
   products = {
     [productKey] = {
@@ -421,7 +439,9 @@ All noisy events shall be debounced. Expensive scans shall be split across frame
 
 ## 9. UI specification
 
-Use Blizzard-style frames, item buttons, icons, tooltips, scroll containers, and expand/collapse controls.
+Use only native Blizzard Lua frames, XML bindings, item buttons, icons,
+tooltips, scroll containers, and expand/collapse controls. HTML/CSS/JavaScript
+are not available to WoW addons.
 
 ### 9.1 Opening the addon
 
@@ -431,6 +451,13 @@ Use Blizzard-style frames, item buttons, icons, tooltips, scroll containers, and
 - Window is movable, resizable, clamped to screen, and remembers its geometry.
 
 ### 9.2 Characters tab
+
+The tab is a persistent two-pane layout. The left pane always lists every
+discovered character, marks the selected row, and shows tracked/available
+status. It includes the native `Track up to` dropdown. The right pane shows the
+selected character overview (or a helpful no-selection message), profession
+rows, scan freshness, and sorted saved bag/bank item rows with item IDs and
+counts. Selecting a row updates `settings.selectedCharacterKey`.
 
 Collapsed row:
 

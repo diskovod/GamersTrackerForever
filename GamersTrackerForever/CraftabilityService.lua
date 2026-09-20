@@ -252,8 +252,8 @@ local function calculate(recipe, characters, options)
     characters = keys,
     compatibleCharacters = compatibleKeys,
     reagents = {},
-    availableNow = { craftableCount = 0, status = "ready", reagents = {} },
-    afterTransfer = { craftableCount = 0, status = "ready", reagents = {} },
+    availableNow = { craftableCount = 0, owned = 0, status = "ready", reagents = {} },
+    afterTransfer = { craftableCount = 0, owned = 0, status = "ready", reagents = {} },
     specialRequirements = hasSpecialRequirements(recipe),
     canCraft = false,
   }
@@ -289,6 +289,9 @@ local function calculate(recipe, characters, options)
     else
       local availableNow = aggregate(recipe, characters, keys, reagent.itemID, reagent.quantity, now, settings, "now", currentKey, transferGroup)
       local afterTransfer = aggregate(recipe, characters, keys, reagent.itemID, reagent.quantity, now, settings, "afterTransfer", currentKey, transferGroup)
+      availableNow.bagCount, availableNow.bankCount = 0, 0
+      result.availableNow.owned = availableNow.owned
+      result.afterTransfer.owned = afterTransfer.owned
       row.availableNow, row.afterTransfer = availableNow, afterTransfer
       for _, characterRow in ipairs(availableNow.characters) do
         if characterRow.characterKey == currentKey then
@@ -297,6 +300,7 @@ local function calculate(recipe, characters, options)
         end
       end
       row.bagCount, row.bankCount = row.bagCount or 0, row.bankCount or 0
+      availableNow.bagCount, availableNow.bankCount = row.bagCount, row.bankCount
       row.owned = afterTransfer.owned
       row.pooledOwned = afterTransfer.owned
       row.shortage = afterTransfer.shortage

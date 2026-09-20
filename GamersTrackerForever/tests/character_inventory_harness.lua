@@ -113,4 +113,50 @@ local legacyScanner = GamersTrackerForever.InventoryScanner:Create(legacyEnv, le
 local legacyTotals = legacyScanner:ScanContainers({ 0 })
 assert(legacyTotals[400] == 5)
 
+-- SoD can report zero container slots briefly while the character enters the
+-- world. That is an unavailable snapshot, not proof that every bag is empty.
+-- A failed early scan must preserve the last valid inventory for the retry.
+local lateReady = false
+local lateEnv = {
+  NUM_BAG_SLOTS = 4,
+  C_Timer = {},
+  C_Container = {
+    GetContainerNumSlots = function(id) return lateReady and (id == 0 and 1 or 0) or 0 end,
+    GetContainerItemInfo = function(id, slot) return lateReady and id == 0 and slot == 1 and { itemID = 6948, stackCount = 2 } or nil end,
+  },
+}
+local lateTimerQueue = {}
+function lateEnv.C_Timer.After(_, callback) lateTimerQueue[#lateTimerQueue + 1] = callback end
+local lateApi = GamersTrackerForever.ApiCompat.CreateClassic(lateEnv)
+local lateRepository = GamersTrackerForever.Repository:Create({})
+lateRepository:Initialize(nil, lateApi)
+lateRepository:UpsertCharacter("classic_era", "late-player", {
+  tracked = true,
+  inventory = { bags = { [6948] = 1 }, bagsScannedAt = 900 },
+})
+local lateScanner = GamersTrackerForever.InventoryScanner:Create(lateEnv, lateApi, lateRepository, {
+  productKey = "classic_era", characterKey = "late-player", clock = function() return 1000 end,
+})
+local lateResult = lateScanner:OnLogin()
+assert(lateResult.success == false, "zero readable bag slots must not be committed as an empty inventory")
+local lateCharacter = lateRepository:GetCharacter("classic_era", "late-player")
+assert(lateCharacter.inventory.bags[6948] == 1 and lateCharacter.inventory.bagsScannedAt == 900,
+  "an unavailable early bag scan must preserve the previous snapshot")
+assert(#lateTimerQueue == 1, "early login should schedule one bounded retry")
+-- PLAYER_LOGIN and PLAYER_ENTERING_WORLD can both fire before that callback.
+-- The second event must invalidate the first timer and arm a fresh retry;
+-- executing the stale callback must not clear the newer timer's state.
+local secondLogin = lateScanner:OnLogin()
+assert(secondLogin.success == false, "the repeated early login remains unavailable")
+assert(#lateTimerQueue == 2, "a repeated login should arm a fresh retry timer")
+assert(lateScanner.loginRetryScheduled == true)
+lateReady = true
+local staleRetry = table.remove(lateTimerQueue, 1); staleRetry()
+assert(lateCharacter.inventory.bags[6948] == 1 and lateScanner.loginRetryScheduled == true,
+  "a stale retry callback must not clear the active retry state")
+local retry = table.remove(lateTimerQueue, 1); retry()
+assert(lateCharacter.inventory.bags[6948] == 2 and lateCharacter.inventory.bagsScannedAt == 1000,
+  "a later readable scan should commit the recovered bag contents")
+assert(lateScanner.loginRetryScheduled == false and lateScanner.loginRetryAttempts == 0)
+
 print("GamersTrackerForever Task 3 character/inventory harness: PASS")

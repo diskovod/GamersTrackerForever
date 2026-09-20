@@ -2,7 +2,7 @@
 ## Title: GamersTrackerForever
 ## Notes: Last-known professions, recipes, and material snapshots for your characters.
 ## Author: GamersTrackerForever
-## Version: 0.1.0
+## Version: 0.2.0
 ## SavedVariables: GamersTrackerForeverDB AltCraftTrackerDB
 ## X-Product: Classic Era
 ## X-Data-Version: 1
@@ -11,6 +11,7 @@ Constants.lua
 ApiCompat.lua
 ApiCompatInventory.lua
 ApiCompatProfessions.lua
+BetaProbe.lua
 EventDispatcher.lua
 Repository.lua
 CharacterService.lua
@@ -23,4 +24,3 @@ UI.lua
 MinimapButton.lua
 SlashCommands.lua
 Bootstrap.lua
-Bindings.xml

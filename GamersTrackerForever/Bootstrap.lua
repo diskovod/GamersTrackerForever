@@ -22,6 +22,9 @@ function GTF:CaptureContext(event, eventLevel)
     return
   end
   local context = self.Api:GetCurrentContext()
+  if type(context) ~= "table" then
+    return nil
+  end
   if eventLevel then
     context.level = tonumber(eventLevel) or context.level
   end
@@ -43,8 +46,11 @@ end
 
 function GTF:GetDatabaseCounts()
   local tracked, recipes = 0, 0
-  local db = self.Repository and type(self.Repository.GetDatabase) == "function"
-    and self.Repository:GetDatabase() or _G.GamersTrackerForeverDB
+  local db = _G.GamersTrackerForeverDB
+  if type(db) ~= "table" then
+    db = self.Repository and type(self.Repository.GetDatabase) == "function"
+      and self.Repository:GetDatabase() or nil
+  end
   if type(db) ~= "table" or type(db.products) ~= "table" then
     return tracked, recipes
   end
@@ -95,10 +101,16 @@ function GTF:GetStatusLines()
   table.sort(unsupported)
   lines[#lines + 1] = "unsupported capabilities " .. (#unsupported > 0 and table.concat(unsupported, ", ") or "none")
   local repositoryDiagnostics = self.Runtime and self.Runtime.repositoryDiagnostics
-  lines[#lines + 1] = "repository " .. (self.Repository and self.Repository:IsReadOnly() and "read-only (newer schema)" or "writable")
+  local repositoryState = "writable"
+  if self.Repository and self.Repository:IsReadOnly() then
+    local reason = type(self.Repository.GetReadOnlyReason) == "function" and self.Repository:GetReadOnlyReason() or "read-only"
+    repositoryState = "read-only (" .. tostring(reason) .. ")"
+  end
+  lines[#lines + 1] = "repository " .. repositoryState
     .. "; diagnostics errors " .. tostring(repositoryDiagnostics and #repositoryDiagnostics.errors or 0)
     .. ", quarantined " .. tostring(repositoryDiagnostics and #repositoryDiagnostics.quarantined or 0)
   lines[#lines + 1] = "last scanner error " .. tostring(self.Runtime and self.Runtime.lastError or "none")
+  lines[#lines + 1] = "compatibility probe " .. (self.BetaProbe and self.BetaProbe.lastResult and "available (run /gtf probe)" or "not run (run /gtf probe)")
   return lines
 end
 
@@ -108,15 +120,30 @@ function GTF:Initialize()
   end
   self.Runtime = { scans = {}, lastError = nil }
   self.Api, self.product = self.ApiCompat.Detect(_G)
+  local supportedProduct = self.product == self.PRODUCT_CLASSIC_ERA
+    and type(self.Api.IsSupported) == "function" and self.Api:IsSupported()
   self.Repository = self.Repository:Create(_G)
   self.Repository:Initialize(_G.GamersTrackerForeverDB, self.Api)
+  if not supportedProduct and type(self.Repository.SetReadOnly) == "function" then
+    self.Repository:SetReadOnly("unsupported product " .. tostring(self.product))
+    self.Runtime.unsupportedProduct = true
+  end
   self.Runtime.repositoryDiagnostics = self.Repository:GetDiagnostics()
+  if self.BetaProbe and type(self.BetaProbe.Create) == "function" then
+    self.BetaProbe = self.BetaProbe:Create(_G, self.Api, self.Repository)
+    if type(self.BetaProbe.Initialize) == "function" then
+      self.BetaProbe:Initialize(self.Api, self.Repository)
+    end
+  end
   self.Dispatcher = self.EventDispatcher:Create(_G)
   self.Commands = self.Commands:Create(_G)
 
   -- Construct the dependency graph in the same order in which snapshots are
   -- consumed. Every constructor is guarded so a missing optional module/API
   -- disables only that feature instead of preventing the addon from loading.
+  -- Unsupported products intentionally do not construct this graph: the
+  -- Classic scanners must never run against an unvalidated client.
+  if supportedProduct then
   if self.InventoryScanner and type(self.InventoryScanner.Create) == "function" then
     self.Inventory = self.InventoryScanner:Create(_G, self.Api, self.Repository, {
       onResult = function(result)
@@ -173,6 +200,7 @@ function GTF:Initialize()
     self.MinimapButton = self.MinimapButton:Create({ env = _G, repository = self.Repository,
       onClick = function() if self.UI and self.UI.Toggle then self.UI:Toggle() end end })
     if type(self.MinimapButton.Initialize) == "function" then self.MinimapButton:Initialize() end
+  end
   end
 
   -- CharacterService owns inventory lifecycle callbacks. Profession lifecycle

@@ -4,9 +4,23 @@ GamersTrackerForever is a Classic Era MVP: an account-wide, last-known tracker
 for character levels, professions,
 learned recipes, bags, banks, and cross-character crafting materials.
 
+The interface uses only native Classic/Season of Discovery Blizzard Lua frames
+and XML bindings; HTML, CSS, and JavaScript are not available to WoW addons.
+The main window has a persistent character selector on the left and a larger
+overview/recipes pane on the right. Its `Track up to` control supports 1–10
+characters (default 3) and never silently untracks existing characters.
+
 The addon is informational. It does not move items, automate protected actions,
-or contact an external service. Forever support is not claimed until its beta
-client can be inspected and the compatibility gate in the specification passes.
+or contact an external service. The installed Forever beta has been identified
+as `wow_classic_beta` build `1.60.1.69913`; it remains diagnostic-only until
+`/gtf probe` supplies the runtime interface and API evidence required by the
+compatibility gate.
+
+Snapshots are stored locally in the account-wide `GamersTrackerForeverDB`
+SavedVariables table. WoW serializes it on `/reload`, logout, clean exit, or
+disconnect. Addons cannot perform arbitrary HTTP requests; future server sync
+would require an explicit export after SavedVariables flush and a companion
+desktop uploader, or another approved bridge.
 
 ## Install
 
@@ -28,11 +42,15 @@ Enable **GamersTrackerForever** on the character-selection AddOns screen, then u
   persistence feasibility research.
 - [`docs/installation.md`](docs/installation.md) — installation, usage, data
   limitations, and validation status.
+- [`docs/forever-beta-compatibility.md`](docs/forever-beta-compatibility.md) —
+  local beta-client findings and release gates.
+- [`docs/forever-beta-probe.md`](docs/forever-beta-probe.md) — safe in-client
+  probe procedure.
 
 ## Current validation status
 
-The manifest targets Classic Era interface `11509`, confirmed from the locally
-installed client metadata. Static integration and package checks were completed.
-The Lua fixture harnesses and in-client checklist are included, but neither was
-executed in this environment because no standalone Lua runtime was available and
-the game client was not launched.
+The supported manifest targets Classic Era/SoD interface `11509`, confirmed
+from the locally installed client metadata. All eight Lua fixture harnesses,
+the SoD XML regression, and diff validation pass locally. In-client acceptance
+still requires launching the relevant game client; the Forever beta is not yet
+declared compatible.

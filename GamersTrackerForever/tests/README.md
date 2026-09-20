@@ -26,6 +26,20 @@ For in-client verification, follow
 `classic-era-acceptance-checklist.md` after installing the addon in Classic
 Era.
 
+The SoD-specific static check (`sod_static_regression.ps1`) verifies that the
+special `Bindings.xml` is not listed in the TOC and uses `category` metadata.
+The character/inventory harness also verifies that zero readable login slots
+preserve the previous bag snapshot and that a bounded delayed retry commits a
+later Hearthstone fixture. All harnesses are compatible with Lua 5.1 and the
+supplied Fengari CLI.
+
+The Forever beta probe harness (`beta_probe_harness.lua`) verifies inert load,
+read-only C_Container aggregate probing, bank access detection without a bank
+scan, product-partition inspection, and output redaction of item names.
+It also verifies that a `1.60.x` beta build reusing project ID `2` is routed
+to `unsupported:2`, selects no Classic scanner, and leaves the repository
+read-only.
+
 ## Task 2 repository harness
 
 `repository_harness.lua` exercises version-1 defaults, context-keyed product and character records, complete atomic snapshot commits, bank preservation when inaccessible, migrations, and valid/missing/corrupt fixture recovery.

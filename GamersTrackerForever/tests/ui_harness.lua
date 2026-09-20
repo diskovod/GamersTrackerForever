@@ -29,6 +29,16 @@ same(characterRows[1].lastSeenLabel, "10s ago", "age formatting")
 same(characterRows[1].bagsFreshness.state, "current", "bag freshness")
 same(characterRows[1].professions[1].recipeScanState, "current", "profession scan state")
 assert(characterRows[1].expanded, "expanded map is projected")
+local pane = GamersTrackerForever.ViewModels.BuildTwoPane(product, { now = 2000, settings = db.settings, productKey = "classic_era", selectedCharacterKey = "ana" })
+same(pane.left.selectedCharacterKey, "ana", "selection is deterministic")
+same(pane.left.maxTrackedCharacters, 3, "default tracking limit")
+same(pane.right.inventoryRows[1].itemID, 100, "detail exposes sorted inventory rows")
+same(pane.right.inventoryRows[1].bags, 4, "detail exposes bag counts")
+product.characters.extra = { tracked = false, identity = { displayName = "Extra" }, inventory = { bags = {}, bank = {} } }
+assert(repo:SetMaxTrackedCharacters(1))
+local limited, limitError = repo:SetTracked("classic_era", "extra", true)
+assert(not limited and limitError:find("tracking limit", 1, true), "tracking limit is enforced without untracking")
+assert(repo:SetMaxTrackedCharacters(3))
 
 local recipeRows = GamersTrackerForever.ViewModels.BuildRecipes(catalog, "classic_era", { search = "potion", profession = "Alchemy" })
 same(#recipeRows, 1, "recipe search and profession filters")
@@ -70,9 +80,26 @@ local function mockFrame()
   return f
 end
 _G.UIParent = mockFrame(); _G.CreateFrame = function() return mockFrame() end
+local dropdownWidth, dropdownText
+_G.UIDropDownMenu_Initialize = function() end
+_G.UIDropDownMenu_CreateInfo = function() return {} end
+_G.UIDropDownMenu_AddButton = function() end
+-- Regression guard: SoD/Classic signatures are (frame, value), not reversed.
+_G.UIDropDownMenu_SetWidth = function(frame, width)
+  assert(type(frame) == "table", "UIDropDownMenu_SetWidth must receive frame first")
+  dropdownWidth = width; frame.dropdownWidth = width
+end
+_G.UIDropDownMenu_SetText = function(frame, value)
+  assert(type(frame) == "table", "UIDropDownMenu_SetText must receive frame first")
+  dropdownText = value; frame.dropdownText = value
+end
 local ui = GamersTrackerForever.UI:Create({ env = { time = function() return 2000 end }, repository = repo, catalog = catalog, craftabilityService = service, productKey = "classic_era" })
 ui:Initialize()
 assert(ui.frame and ui.initialized and ui.title and ui.characterScroll, "mocked-frame UI initializes")
+same(ui.frame.w, 900, "native UI default width")
+same(ui.frame.h, 560, "native UI default height")
+same(dropdownWidth, 92, "dropdown width uses frame-first SoD signature")
+same(dropdownText, "3", "dropdown text uses frame-first SoD signature")
 ui.tab = "recipes"; ui:Refresh(); assert(ui.recipeScroll and ui.recipeContent, "recipes tab renders")
 
 print("GamersTrackerForever Task 6 UI/view-model harness: PASS")

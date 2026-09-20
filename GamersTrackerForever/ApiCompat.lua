@@ -27,6 +27,18 @@ end
 local Classic = {}
 Classic.__index = Classic
 
+-- Classic Era and Season of Discovery currently report the 1.15.x client
+-- family.  Project constants alone are not sufficient: the Forever beta has
+-- been observed with a Classic-looking project id while reporting 1.60.x.
+-- Keep this gate deliberately narrow until a Forever adapter is validated.
+local function isVerifiedClassicClient(env)
+  if not hasFunction(env, "GetBuildInfo") then
+    return false
+  end
+  local version = env.GetBuildInfo()
+  return type(version) == "string" and version:match("^1%.15%.[0-9]+") ~= nil
+end
+
 function Classic:ReadClientInfo()
   local version, build, date, interface = "", "", "", 0
   if hasFunction(self.env, "GetBuildInfo") then
@@ -49,6 +61,10 @@ end
 
 function Classic:GetProduct()
   return self.productKey or GTF.PRODUCT_CLASSIC_ERA
+end
+
+function Classic:IsSupported()
+  return true
 end
 
 function Classic:GetCurrentIdentity()
@@ -149,6 +165,8 @@ function Classic:GetCapabilities()
     [GTF.CAPABILITY.TRANSFER_GROUP] = hasFunction(env, "UnitFactionGroup") and (hasFunction(env, "GetRealmName") or hasFunction(env, "UnitFullName")),
     [GTF.CAPABILITY.EVENT_DISPATCH] = true,
     [GTF.CAPABILITY.SLASH_COMMANDS] = true,
+    [GTF.CAPABILITY.FOREVER_COMPATIBILITY_PROBE] = true,
+    [GTF.CAPABILITY.SAVED_VARIABLES_PRODUCT_PARTITIONS] = true,
   }
 end
 
@@ -158,18 +176,75 @@ function ApiCompat.CreateClassic(env, productKey)
   return adapter
 end
 
+local Unsupported = {}
+Unsupported.__index = Unsupported
+
+function Unsupported:ReadClientInfo()
+  local version, build, date, interface = "", "", "", 0
+  if hasFunction(self.env, "GetBuildInfo") then
+    version, build, date, interface = self.env.GetBuildInfo()
+  end
+  return {
+    productID = self.env.WOW_PROJECT_ID or 0,
+    product = self.productKey,
+    version = safeString(version),
+    build = safeString(build),
+    date = safeString(date),
+    interface = tonumber(interface) or 0,
+  }
+end
+
+function Unsupported:GetClientInfo()
+  self.clientInfo = self:ReadClientInfo()
+  return self.clientInfo
+end
+
+function Unsupported:GetProduct()
+  return self.productKey
+end
+
+function Unsupported:GetCurrentContext()
+  return nil, "unsupported product; no Classic adapter selected"
+end
+
+function Unsupported:GetCapabilities()
+  return {
+    [GTF.CAPABILITY.PRODUCT_DETECTION] = true,
+    [GTF.CAPABILITY.SAVED_VARIABLES] = true,
+    [GTF.CAPABILITY.SLASH_COMMANDS] = true,
+    [GTF.CAPABILITY.EVENT_DISPATCH] = true,
+    [GTF.CAPABILITY.FOREVER_COMPATIBILITY_PROBE] = true,
+    [GTF.CAPABILITY.SAVED_VARIABLES_PRODUCT_PARTITIONS] = true,
+  }
+end
+
+function Unsupported:IsSupported()
+  return false
+end
+
+function ApiCompat.CreateUnsupported(env, productKey)
+  local adapter = setmetatable({ env = env or _G, productKey = productKey or "unsupported:unknown" }, Unsupported)
+  adapter.clientInfo = adapter:ReadClientInfo()
+  return adapter
+end
+
 function ApiCompat.Detect(env)
   env = env or _G
   local projectID = env.WOW_PROJECT_ID
   local classicID = env.WOW_PROJECT_CLASSIC_ERA or env.WOW_PROJECT_CLASSIC
-  local isClassic = projectID == nil or (classicID ~= nil and projectID == classicID) or projectID == 2
+  local verifiedBuild = isVerifiedClassicClient(env)
+  local isClassic = verifiedBuild and (projectID == nil
+    or (classicID ~= nil and projectID == classicID)
+    or projectID == 2)
   if isClassic then
     return ApiCompat.CreateClassic(env), GTF.PRODUCT_CLASSIC_ERA
   end
   -- The Classic .toc is not a Forever adapter. Keep the probe useful while
-  -- making an unvalidated product visible instead of silently claiming support.
-  local productKey = "unsupported:" .. tostring(projectID)
-  return ApiCompat.CreateClassic(env, productKey), productKey
+  -- making an unvalidated product visible.  Never return the Classic adapter
+  -- for an unverified build, even when a beta reuses project id 2.
+  local productKey = "unsupported:" .. tostring(projectID or "unknown")
+  return ApiCompat.CreateUnsupported(env, productKey), productKey
 end
 
 GTF.ApiCompat.Classic = Classic
+GTF.ApiCompat.Unsupported = Unsupported

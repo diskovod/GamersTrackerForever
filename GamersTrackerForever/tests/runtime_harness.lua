@@ -32,6 +32,7 @@ local root = "."
 local files = {
   root .. "/Constants.lua",
   root .. "/ApiCompat.lua",
+  root .. "/BetaProbe.lua",
   root .. "/EventDispatcher.lua",
   root .. "/SlashCommands.lua",
   root .. "/Repository.lua",
@@ -93,7 +94,9 @@ local trackedCount, recipeCount = GamersTrackerForever:GetDatabaseCounts()
 assert(trackedCount == 1 and recipeCount == 1)
 SlashCmdList.GAMERSTRACKERFOREVER("status")
 assert(#messages > 0)
-assert(messages[1]:match("version 0.1.0"))
+SlashCmdList.GAMERSTRACKERFOREVER("probe")
+assert(GamersTrackerForever.BetaProbe and GamersTrackerForever.BetaProbe.lastResult)
+assert(messages[1]:match("version 0.2.0"))
 local foundUnsupported = false
 for _, message in ipairs(messages) do
   if message:match("unsupported capabilities") then

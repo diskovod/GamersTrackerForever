@@ -22,6 +22,23 @@ function Commands:Status()
   end
 end
 
+function Commands:Probe()
+  local probe = GTF.BetaProbe
+  if not probe or type(probe.Run) ~= "function" then
+    self:Print("compatibility probe is unavailable")
+    return
+  end
+  local ok, result = pcall(probe.Run, probe)
+  if not ok then
+    GTF:SetError(result)
+    self:Print("compatibility probe failed")
+    return
+  end
+  for _, line in ipairs(probe:FormatLines(result)) do
+    self:Print(line)
+  end
+end
+
 function Commands:Handle(message)
   local command = tostring(message or ""):lower():match("^%s*(.-)%s*$")
   if command == "" or command == "toggle" or command == "open" then
@@ -30,6 +47,10 @@ function Commands:Handle(message)
   end
   if command == "status" then
     self:Status()
+    return
+  end
+  if command == "probe" then
+    self:Probe()
     return
   end
   local minimap = command:match("^minimap%s*(.*)$")
@@ -47,7 +68,7 @@ function Commands:Handle(message)
     self:Print("minimap button " .. (button:IsEnabled() and "enabled" or "disabled"))
     return
   end
-  self:Print("usage: /gtf [status|toggle|minimap on|off|toggle] (alias: /act)")
+  self:Print("usage: /gtf [status|probe|toggle|minimap on|off|toggle] (alias: /act)")
 end
 
 function Commands:Initialize()

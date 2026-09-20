@@ -53,7 +53,7 @@ assert(GamersTrackerForever:Initialize())
 assert(GamersTrackerForever.Api and GamersTrackerForever.Repository and GamersTrackerForever.Characters)
 assert(GamersTrackerForever.Professions and GamersTrackerForever.Inventory and GamersTrackerForever.Catalog)
 assert(GamersTrackerForever.Repository.db.settings.minimapButton == true)
-assert(GamersTrackerForever.Repository.db.settings.uiGeometry.width == 610)
+assert(GamersTrackerForever.Repository.db.settings.uiGeometry.width == 900)
 
 GamersTrackerForever.Dispatcher:Dispatch("PLAYER_LOGIN")
 local firstBagCalls = calls.bags
@@ -83,14 +83,19 @@ assert(futureRepo:IsReadOnly() and future.schemaVersion == 99, "future schema wa
 
 local geometryRoot = { schemaVersion = 1, settings = {
   minimapButton = false, minimapAngle = 135,
-  uiGeometry = { point = "TOPLEFT", relative = "TOPLEFT", x = 17, y = -23, width = 700, height = 500 },
+  uiGeometry = { point = "TOPLEFT", relative = "TOPLEFT", x = 17, y = -23, width = 800, height = 500 },
 }, products = {} }
 local geometryRepo = GamersTrackerForever.Repository:Create({})
 geometryRepo:Initialize(geometryRoot)
 assert(geometryRepo.db.settings.minimapButton == false and geometryRepo.db.settings.minimapAngle == 135)
-assert(geometryRepo.db.settings.uiGeometry.point == "TOPLEFT" and geometryRepo.db.settings.uiGeometry.width == 700)
+assert(geometryRepo.db.settings.uiGeometry.point == "TOPLEFT" and geometryRepo.db.settings.uiGeometry.width == 800)
 local reloadedRepo = GamersTrackerForever.Repository:Create({})
 reloadedRepo:Initialize(geometryRepo.db)
 assert(reloadedRepo.db.settings.uiGeometry.height == 500, "UI geometry was lost during normalization/reload")
+
+local legacyGeometryRepo = GamersTrackerForever.Repository:Create({})
+legacyGeometryRepo:Initialize({ schemaVersion = 1, settings = { uiGeometry = { width = 610, height = 320 } }, products = {} })
+assert(legacyGeometryRepo.db.settings.uiGeometry.width == 760, "legacy narrow geometry was not normalized")
+assert(legacyGeometryRepo.db.settings.uiGeometry.height == 400, "legacy short geometry was not normalized")
 
 print("GamersTrackerForever Task 7 integration harness: PASS")

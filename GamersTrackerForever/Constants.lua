@@ -3,7 +3,7 @@ GamersTrackerForever = GamersTrackerForever or {}
 local GTF = GamersTrackerForever
 
 GTF.ADDON_NAME = "GamersTrackerForever"
-GTF.ADDON_VERSION = "0.1.0"
+GTF.ADDON_VERSION = "0.2.0"
 GTF.SCHEMA_VERSION = 1
 GTF.DATA_VERSION = 1
 GTF.PRODUCT_CLASSIC_ERA = "classic_era"
@@ -25,6 +25,8 @@ GTF.CAPABILITY = {
   TRANSFER_GROUP = "transfer_group",
   EVENT_DISPATCH = "event_dispatch",
   SLASH_COMMANDS = "slash_commands",
+  FOREVER_COMPATIBILITY_PROBE = "forever_compatibility_probe",
+  SAVED_VARIABLES_PRODUCT_PARTITIONS = "saved_variables_product_partitions",
 }
 
 GTF.EVENTS = {

@@ -84,15 +84,17 @@ end
 local function professionDisplayName(product, recipe, knownBy)
   if recipe.professionName or recipe.profession then return recipe.professionName or recipe.profession end
   local professionID = number(recipe.professionID, 0)
+  local fallback
   for _, characterKey in ipairs(knownBy or {}) do
     local character = product and product.characters and product.characters[characterKey]
     for _, profession in pairs((character and character.professions) or {}) do
       if type(profession) == "table" and number(profession.professionID, 0) == professionID then
         return profession.name or ""
       end
+      if type(profession) == "table" and not fallback and profession.name then fallback = profession.name end
     end
   end
-  return ""
+  return fallback or ""
 end
 
 local function statusRank(status)

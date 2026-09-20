@@ -32,6 +32,45 @@ local function mapKeys(map)
   return result
 end
 
+local function itemName(itemID, resolver)
+  if type(resolver) == "function" then
+    local ok, name, link, icon = pcall(resolver, itemID)
+    if ok and (name or link or icon) then
+      return text(name, "Item " .. tostring(itemID)), link, icon
+    end
+  end
+  return "Item " .. tostring(itemID), nil, nil
+end
+
+-- Inventory rows intentionally expose both locations and freshness.  This is
+-- a pure projection so the native renderer and fixture tests see the same
+-- deterministic view, even when an item is not in the local cache.
+function ViewModels.BuildInventoryRows(character, options)
+  options = type(options) == "table" and options or {}
+  character = type(character) == "table" and character or {}
+  local inventory = type(character.inventory) == "table" and character.inventory or {}
+  local bags, bank = inventory.bags or {}, inventory.bank or {}
+  local ids, seen = {}, {}
+  for id in pairs(bags) do if tonumber(id) and tonumber(id) > 0 then seen[tonumber(id)] = true end end
+  for id in pairs(bank) do if tonumber(id) and tonumber(id) > 0 then seen[tonumber(id)] = true end end
+  for id in pairs(seen) do ids[#ids + 1] = id end
+  local resolver = options.itemResolver
+  table.sort(ids, function(a, b)
+    local an = lower(itemName(a, resolver)); local bn = lower(itemName(b, resolver))
+    if an ~= bn then return an < bn end
+    return a < b
+  end)
+  local rows = {}
+  for _, itemID in ipairs(ids) do
+    local name, link, icon = itemName(itemID, resolver)
+    local bagCount = number(bags[itemID] or bags[tostring(itemID)], 0)
+    local bankCount = number(bank[itemID] or bank[tostring(itemID)], 0)
+    rows[#rows + 1] = { itemID = itemID, name = name, link = link, icon = icon,
+      bags = bagCount, bank = bankCount, total = bagCount + bankCount }
+  end
+  return rows
+end
+
 local function characterName(character, key)
   local identity = character and character.identity or {}
   return text(identity.displayName, text(key, "Unknown"))
@@ -94,6 +133,7 @@ function ViewModels.BuildCharacters(product, options)
   product = type(product) == "table" and product or {}
   local now, settings = number(options.now, 0), options.settings
   local characters, rows = product.characters or {}, {}
+  local selectedKey = options.selectedCharacterKey
   local characterKeys = keys(characters)
   table.sort(characterKeys, function(a, b) return compareCharacters(characters, a, b) end)
   for _, key in ipairs(characterKeys) do
@@ -129,10 +169,56 @@ function ViewModels.BuildCharacters(product, options)
         bankFreshness = ViewModels.Freshness(inventory.bankScannedAt, now, settings),
         bagsScannedAt = number(inventory.bagsScannedAt, 0), bankScannedAt = number(inventory.bankScannedAt, 0),
         expanded = options.expanded and options.expanded[key] == true or false,
+        selected = tostring(selectedKey or "") == tostring(key),
+        inventoryRows = ViewModels.BuildInventoryRows(character, options),
       }
     end
   end
   return rows
+end
+
+function ViewModels.BuildCharacterSelector(product, options)
+  options = type(options) == "table" and options or {}
+  local settings = options.settings or {}
+  local rows = ViewModels.BuildCharacters(product, {
+    now = options.now, settings = settings, productKey = options.productKey,
+    includeUntracked = true, selectedCharacterKey = options.selectedCharacterKey or settings.selectedCharacterKey,
+    itemResolver = options.itemResolver,
+  })
+  local tracked = 0
+  for _, row in ipairs(rows) do if row.tracked then tracked = tracked + 1 end end
+  local limit = math.max(1, math.min(10, math.floor(number(options.maxTrackedCharacters or settings.maxTrackedCharacters, 3))))
+  return { characters = rows, rows = rows, trackedCount = tracked, maxTrackedCharacters = limit,
+    selectedCharacterKey = options.selectedCharacterKey or settings.selectedCharacterKey,
+    header = "Tracked " .. tostring(tracked) .. " / " .. tostring(limit),
+    trackLimitLabel = "Track up to", emptyLabel = #rows == 0 and "No characters discovered yet" or nil }
+end
+
+function ViewModels.BuildCharacterDetail(product, characterKey, options)
+  options = type(options) == "table" and options or {}
+  product = type(product) == "table" and product or {}
+  local character = product.characters and (product.characters[characterKey] or product.characters[tostring(characterKey)])
+  if type(character) ~= "table" then
+    return { selectedCharacterKey = characterKey, empty = true, title = "No character selected",
+      message = "Select a discovered character from the list." }
+  end
+  local rows = ViewModels.BuildCharacters(product, { now = options.now, settings = options.settings,
+    includeUntracked = true, selectedCharacterKey = characterKey, itemResolver = options.itemResolver })
+  for _, row in ipairs(rows) do if tostring(row.key) == tostring(characterKey) then
+    row.empty = false; row.overview = { name = row.name, realm = row.realm, level = row.level,
+      className = row.className, faction = row.faction, lastSeenAt = row.lastSeenAt,
+      bagsFreshness = row.bagsFreshness, bankFreshness = row.bankFreshness }
+    return row
+  end end
+  return { selectedCharacterKey = characterKey, empty = true, title = "No character selected" }
+end
+
+function ViewModels.BuildTwoPane(product, options)
+  options = type(options) == "table" and options or {}
+  local left = ViewModels.BuildCharacterSelector(product, options)
+  local selected = left.selectedCharacterKey
+  if not selected and left.characters[1] then selected = left.characters[1].key end
+  return { left = left, right = ViewModels.BuildCharacterDetail(product, selected, options), selectedCharacterKey = selected }
 end
 
 function ViewModels.BuildRecipes(catalog, productKey, query)

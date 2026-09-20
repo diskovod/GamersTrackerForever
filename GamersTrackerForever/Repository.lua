@@ -83,13 +83,15 @@ local function defaultSettings()
     -- survive a reload without being mistaken for scanner data.
     minimapButton = true,
     minimapAngle = 0,
+    maxTrackedCharacters = 3,
+    selectedCharacterKey = nil,
     uiGeometry = {
       point = "CENTER",
       relative = "CENTER",
       x = 0,
       y = 0,
-      width = 610,
-      height = 470,
+      width = 900,
+      height = 560,
     },
   }
 end
@@ -202,8 +204,11 @@ local function normalizeSettings(value, diagnostics)
       relative = stringOr(geometry.relative, defaults.uiGeometry.relative),
       x = numberOr(geometry.x, defaults.uiGeometry.x),
       y = numberOr(geometry.y, defaults.uiGeometry.y),
-      width = math.max(460, numberOr(geometry.width, defaults.uiGeometry.width)),
-      height = math.max(320, numberOr(geometry.height, defaults.uiGeometry.height)),
+      -- The two-pane layout needs room for the recipe filters and a genuinely
+      -- larger detail pane.  Clamp legacy 610px saves during normalization so
+      -- an old installation cannot reopen with clipped controls.
+      width = math.max(760, numberOr(geometry.width, defaults.uiGeometry.width)),
+      height = math.max(400, numberOr(geometry.height, defaults.uiGeometry.height)),
     }
   end
   return {
@@ -211,6 +216,8 @@ local function normalizeSettings(value, diagnostics)
     veryStaleAfterSeconds = numberOr(value.veryStaleAfterSeconds, 604800),
     minimapButton = value.minimapButton ~= false,
     minimapAngle = numberOr(value.minimapAngle, defaults.minimapAngle),
+    maxTrackedCharacters = math.max(1, math.min(10, math.floor(numberOr(value.maxTrackedCharacters, defaults.maxTrackedCharacters)))),
+    selectedCharacterKey = optionalString(value.selectedCharacterKey),
     uiGeometry = geometry,
   }
 end
@@ -509,7 +516,7 @@ local function migrationOne(value, diagnostics)
 end
 
 function Repository:Create(env)
-  return setmetatable({ env = env or _G, db = nil, readOnly = false, unsupportedSchema = false, diagnostics = { errors = {}, quarantined = {}, migrated = false } }, Repository)
+  return setmetatable({ env = env or _G, db = nil, readOnly = false, readOnlyReason = nil, unsupportedSchema = false, diagnostics = { errors = {}, quarantined = {}, migrated = false } }, Repository)
 end
 
 function Repository:RegisterMigration(version, migration)
@@ -554,6 +561,7 @@ end
 function Repository:Initialize(savedVariables, api)
   self.diagnostics = { errors = {}, quarantined = {}, migrated = false }
   self.readOnly = false
+  self.readOnlyReason = nil
   self.unsupportedSchema = false
   self.api = api or self.api
   local root = savedVariables
@@ -575,6 +583,9 @@ function Repository:Initialize(savedVariables, api)
     root = Repository.DefaultDatabase()
   else
     local originalRoot = root
+    -- Normalize a copy so loading SavedVariables never destroys evidence of
+    -- malformed records before a second repository/fixture can diagnose it.
+    root = copy(root)
     root = self:Migrate(root)
     if not root then
       if self.unsupportedSchema then
@@ -619,6 +630,16 @@ end
 
 function Repository:IsReadOnly()
   return self.readOnly == true
+end
+
+function Repository:SetReadOnly(reason)
+  self.readOnly = true
+  self.readOnlyReason = reason and tostring(reason) or self.readOnlyReason or "read-only"
+  return self
+end
+
+function Repository:GetReadOnlyReason()
+  return self.readOnlyReason
 end
 
 function Repository:GetProduct(productKey, create)
@@ -689,6 +710,16 @@ function Repository:UpsertCharacter(productKey, characterKey, context)
   if context.lastSeenAt ~= nil then
     character.lastSeenAt = numberOr(context.lastSeenAt, character.lastSeenAt)
   end
+  if type(context.inventory) == "table" then
+    local incoming = normalizeInventory(context.inventory, self.diagnostics, "context.inventory")
+    local previous = character.inventory or defaultInventory()
+    character.inventory = {
+      bags = context.inventory.bags ~= nil and incoming.bags or previous.bags,
+      bank = context.inventory.bank ~= nil and incoming.bank or previous.bank,
+      bagsScannedAt = context.inventory.bagsScannedAt ~= nil and incoming.bagsScannedAt or previous.bagsScannedAt,
+      bankScannedAt = context.inventory.bankScannedAt ~= nil and incoming.bankScannedAt or previous.bankScannedAt,
+    }
+  end
   return character
 end
 
@@ -721,7 +752,47 @@ function Repository:SetTracked(productKey, characterKey, tracked)
   if not character or type(tracked) ~= "boolean" then
     return false
   end
+  if tracked and character.tracked ~= true then
+    local settings = self.db and self.db.settings or defaultSettings()
+    local limit = math.max(1, math.min(10, math.floor(numberOr(settings.maxTrackedCharacters, 3))))
+    local count = 0
+    local product = self:GetProduct(productKey, false)
+    for _, candidate in pairs(product and product.characters or {}) do
+      if type(candidate) == "table" and candidate.tracked == true then count = count + 1 end
+    end
+    if count >= limit then
+      return false, "tracking limit reached (" .. tostring(limit) .. ")"
+    end
+  end
   character.tracked = tracked
+  return true
+end
+
+function Repository:GetMaxTrackedCharacters()
+  local settings = self.db and self.db.settings or defaultSettings()
+  return math.max(1, math.min(10, math.floor(numberOr(settings.maxTrackedCharacters, 3))))
+end
+
+function Repository:SetMaxTrackedCharacters(value)
+  if self.readOnly then return false, "repository is read-only for a newer schema" end
+  local limit = tonumber(value)
+  if not limit then return false, "tracking limit must be a number" end
+  limit = math.max(1, math.min(10, math.floor(limit)))
+  self.db.settings.maxTrackedCharacters = limit
+  return true, limit
+end
+
+function Repository:GetSelectedCharacterKey()
+  return self.db and self.db.settings and self.db.settings.selectedCharacterKey or nil
+end
+
+function Repository:SetSelectedCharacterKey(characterKey)
+  if self.readOnly then return false, "repository is read-only for a newer schema" end
+  if characterKey == nil or characterKey == "" then
+    self.db.settings.selectedCharacterKey = nil
+  else
+    self.db.settings.selectedCharacterKey = tostring(characterKey)
+  end
   return true
 end
 

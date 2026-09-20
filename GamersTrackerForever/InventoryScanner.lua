@@ -41,10 +41,10 @@ local function resolveKeys(self)
   return self.productKey, self.characterKey
 end
 
-local function scheduleTimer(self, callback)
+local function scheduleTimer(self, callback, delay)
   local timer = self.env and self.env.C_Timer
   if type(timer) == "table" and type(timer.After) == "function" then
-    timer.After(self.debounceSeconds, callback)
+    timer.After(tonumber(delay) or self.debounceSeconds, callback)
     return true
   end
   return false
@@ -71,6 +71,10 @@ function InventoryScanner:Create(env, api, repository, options)
     pendingBags = false,
     pendingBank = false,
     bankOpen = false,
+    loginRetryScheduled = false,
+    loginRetryAttempts = 0,
+    loginRetryGeneration = 0,
+    loginRetryDelays = options.loginRetryDelays or { 1, 3 },
     lastResults = {},
     lastError = nil,
     productKey = options.productKey,
@@ -116,12 +120,13 @@ function InventoryScanner:ScanContainers(containerIDs)
     or type(self.api.GetContainerItemInfo) ~= "function" then
     return nil, "container API unavailable"
   end
-  local totals = {}
+  local totals, readableSlots = {}, 0
   for _, containerID in ipairs(containerIDs) do
     local slots = tonumber(self.api:GetContainerNumSlots(containerID))
     if slots == nil or slots < 0 then
       return nil, "invalid container slot count"
     end
+    readableSlots = readableSlots + slots
     for slot = 1, slots do
       local info = self.api:GetContainerItemInfo(containerID, slot)
       if type(info) == "table" then
@@ -134,7 +139,13 @@ function InventoryScanner:ScanContainers(containerIDs)
       end
     end
   end
-  return totals
+  -- During PLAYER_LOGIN/PLAYER_ENTERING_WORLD SoD may temporarily expose every
+  -- container with zero readable slots.  An empty map in that state is not an
+  -- empty inventory and must not replace a prior valid snapshot.
+  if readableSlots <= 0 then
+    return nil, "containers are not readable yet", { readableSlots = 0 }
+  end
+  return totals, nil, { readableSlots = readableSlots }
 end
 
 function InventoryScanner:CommitKeys()
@@ -286,7 +297,50 @@ function InventoryScanner:Reconcile(scannedAt)
 end
 
 function InventoryScanner:OnLogin(scannedAt)
-  return self:ScanBags(scannedAt)
+  -- PLAYER_LOGIN and PLAYER_ENTERING_WORLD can both arrive before the first
+  -- delayed retry fires.  Invalidate the previous callback and start a fresh
+  -- bounded retry sequence for the newest login event.  The old timer cannot
+  -- be cancelled on every Classic client, so its callback must remain a no-op
+  -- when it observes the newer generation below.
+  self.loginRetryGeneration = (self.loginRetryGeneration or 0) + 1
+  self.loginRetryCancelled = false
+  self.loginRetryAttempts = 0
+  self.loginRetryScheduled = false
+  local result = self:ScanBags(scannedAt)
+  if result and result.success then
+    return result
+  end
+  self:QueueLoginRetry()
+  return result
+end
+
+function InventoryScanner:QueueLoginRetry()
+  if self.loginRetryScheduled then return false end
+  local delays = self.loginRetryDelays or { 1, 3 }
+  local nextAttempt = (tonumber(self.loginRetryAttempts) or 0) + 1
+  if nextAttempt > #delays then return false end
+  self.loginRetryAttempts = nextAttempt
+  self.loginRetryScheduled = true
+  local delay = tonumber(delays[nextAttempt]) or 1
+  local generation = self.loginRetryGeneration or 0
+  local timer = self.env and self.env.C_Timer
+  if type(timer) ~= "table" or type(timer.After) ~= "function" then
+    self.loginRetryScheduled = false
+    return false
+  end
+  timer.After(delay, function()
+    -- A subsequent login/world event may have invalidated this timer.  Do not
+    -- clear loginRetryScheduled here: that flag belongs to the newer timer.
+    if self.loginRetryCancelled or generation ~= (self.loginRetryGeneration or 0) then return end
+    self.loginRetryScheduled = false
+    local result = self:ScanBags()
+    if result and result.success then
+      self.loginRetryAttempts = 0
+    else
+      self:QueueLoginRetry()
+    end
+  end)
+  return true
 end
 
 function InventoryScanner:OnLogout(scannedAt)
@@ -295,6 +349,9 @@ function InventoryScanner:OnLogout(scannedAt)
   -- than performing a second post-logout write.
   self.pendingBags = false
   self.pendingBank = false
+  self.loginRetryScheduled = false
+  self.loginRetryCancelled = true
+  self.loginRetryGeneration = (self.loginRetryGeneration or 0) + 1
   local result = self:ScanBags(scannedAt)
   if self:IsBankAccessible() then result.bank = self:ScanBank(scannedAt) end
   return result
