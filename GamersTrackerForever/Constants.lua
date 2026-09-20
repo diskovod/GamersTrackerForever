@@ -3,7 +3,7 @@ GamersTrackerForever = GamersTrackerForever or {}
 local GTF = GamersTrackerForever
 
 GTF.ADDON_NAME = "GamersTrackerForever"
-GTF.ADDON_VERSION = "0.2.0"
+GTF.ADDON_VERSION = "0.2.1"
 GTF.SCHEMA_VERSION = 1
 GTF.DATA_VERSION = 1
 GTF.PRODUCT_CLASSIC_ERA = "classic_era"

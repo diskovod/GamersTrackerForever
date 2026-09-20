@@ -110,6 +110,12 @@ function GTF:GetStatusLines()
     .. "; diagnostics errors " .. tostring(repositoryDiagnostics and #repositoryDiagnostics.errors or 0)
     .. ", quarantined " .. tostring(repositoryDiagnostics and #repositoryDiagnostics.quarantined or 0)
   lines[#lines + 1] = "last scanner error " .. tostring(self.Runtime and self.Runtime.lastError or "none")
+  local skippedEvents = {}
+  for event in pairs(self.Dispatcher and self.Dispatcher.unsupportedEvents or {}) do
+    skippedEvents[#skippedEvents + 1] = event
+  end
+  table.sort(skippedEvents)
+  lines[#lines + 1] = "skipped client events " .. (#skippedEvents > 0 and table.concat(skippedEvents, ", ") or "none")
   lines[#lines + 1] = "compatibility probe " .. (self.BetaProbe and self.BetaProbe.lastResult and "available (run /gtf probe)" or "not run (run /gtf probe)")
   return lines
 end

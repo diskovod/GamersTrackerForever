@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.2.0 — Classic Era / Season of Discovery installation
+# GamersTrackerForever 0.2.1 — Classic Era / Season of Discovery installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.2.0-classic.zip` so it creates exactly:
+2. Extract `GamersTrackerForever-0.2.1-classic.zip` so it creates exactly:
    `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
 3. Start the Classic Era client and enable **GamersTrackerForever** on the character-selection AddOns list. The package targets interface **11509**.
 

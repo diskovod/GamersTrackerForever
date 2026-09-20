@@ -23,7 +23,12 @@ SlashCmdList = {}
 function CreateFrame()
   local frame = {}
   frames[#frames + 1] = frame
-  function frame:RegisterEvent(event) registeredEvents[event] = true end
+  function frame:RegisterEvent(event)
+    if event == "TRADE_SKILL_UPDATE" then
+      error('Attempt to register unknown event "TRADE_SKILL_UPDATE"')
+    end
+    registeredEvents[event] = true
+  end
   function frame:SetScript(kind, callback) frame[kind] = callback end
   return frame
 end
@@ -49,6 +54,8 @@ assert(GamersTrackerForever.product == "classic_era")
 assert(GamersTrackerForever.Api:GetCurrentContext().key == "Player-1-0001")
 assert(GamersTrackerForever.Api:GetTransferGroup() == "classic_era|test-realm|alliance")
 assert(registeredEvents.PLAYER_LOGIN and registeredEvents.PLAYER_LOGOUT)
+assert(not registeredEvents.TRADE_SKILL_UPDATE, "unsupported events must be skipped")
+assert(GamersTrackerForever.Dispatcher.unsupportedEvents.TRADE_SKILL_UPDATE:match("unknown event"))
 assert(SlashCmdList.GAMERSTRACKERFOREVER)
 assert(SLASH_GAMERSTRACKERFOREVER1 == "/gtf" and SLASH_GAMERSTRACKERFOREVER2 == "/act")
 local firstSubscriber, secondSubscriber = false, false
@@ -96,12 +103,17 @@ SlashCmdList.GAMERSTRACKERFOREVER("status")
 assert(#messages > 0)
 SlashCmdList.GAMERSTRACKERFOREVER("probe")
 assert(GamersTrackerForever.BetaProbe and GamersTrackerForever.BetaProbe.lastResult)
-assert(messages[1]:match("version 0.2.0"))
+assert(messages[1]:match("version 0.2.1"))
 local foundUnsupported = false
+local foundSkippedEvent = false
 for _, message in ipairs(messages) do
   if message:match("unsupported capabilities") then
     foundUnsupported = true
   end
+  if message:match("skipped client events TRADE_SKILL_UPDATE") then
+    foundSkippedEvent = true
+  end
 end
 assert(foundUnsupported)
+assert(foundSkippedEvent)
 print("GamersTrackerForever Task 1 runtime harness: PASS")

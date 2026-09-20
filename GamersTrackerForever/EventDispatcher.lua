@@ -6,7 +6,13 @@ Dispatcher.__index = Dispatcher
 GTF.EventDispatcher = Dispatcher
 
 function Dispatcher:Create(env)
-  local dispatcher = setmetatable({ env = env or _G, handlers = {}, lastEvents = {}, frame = nil }, Dispatcher)
+  local dispatcher = setmetatable({
+    env = env or _G,
+    handlers = {},
+    lastEvents = {},
+    unsupportedEvents = {},
+    frame = nil,
+  }, Dispatcher)
   return dispatcher
 end
 
@@ -43,7 +49,13 @@ function Dispatcher:Initialize()
   self.frame = createFrame("Frame", "GamersTrackerForeverEventFrame")
   for _, event in ipairs(GTF.EVENTS) do
     if self.frame.RegisterEvent then
-      self.frame:RegisterEvent(event)
+      -- Event availability differs between Classic branches and beta builds.
+      -- Register each event independently so one removed/renamed event cannot
+      -- abort initialization of the entire addon.
+      local ok, registered = pcall(self.frame.RegisterEvent, self.frame, event)
+      if not ok or registered == false then
+        self.unsupportedEvents[event] = ok and "registration returned false" or tostring(registered)
+      end
     end
   end
   if self.frame.SetScript then

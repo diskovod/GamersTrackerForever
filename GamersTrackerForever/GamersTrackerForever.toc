@@ -2,7 +2,7 @@
 ## Title: GamersTrackerForever
 ## Notes: Last-known professions, recipes, and material snapshots for your characters.
 ## Author: GamersTrackerForever
-## Version: 0.2.0
+## Version: 0.2.1
 ## SavedVariables: GamersTrackerForeverDB AltCraftTrackerDB
 ## X-Product: Classic Era
 ## X-Data-Version: 1
