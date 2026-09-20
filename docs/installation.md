@@ -22,7 +22,15 @@
 
 ## Data and freshness
 
-Saved data is account-wide in `GamersTrackerForeverDB`. If an existing installation has data in the legacy `AltCraftTrackerDB`, the first load copies it into `GamersTrackerForeverDB` without changing the schema. Other characters are last-known snapshots; the addon cannot inspect an offline character. Bags scan at login, after debounced bag events, every ten minutes, and during logout. Bank data scans only while the bank is accessible and remains last-known after closing the bank. Learned recipes are captured when a profession window is open and has settled.
+Saved data is account-wide in `GamersTrackerForeverDB`, written by WoW to
+`WTF\Account\<account>\SavedVariables\GamersTrackerForever.lua` on `/reload`,
+logout, or a clean exit. If an existing installation has data in the legacy
+`AltCraftTrackerDB`, the first load copies it into `GamersTrackerForeverDB`
+without changing the schema. Other characters are last-known snapshots; the
+addon cannot inspect an offline character. Bags scan at login, after debounced
+bag events, every ten minutes, and during logout. Bank data scans only while
+the bank is accessible and remains last-known after closing the bank. Learned
+recipes are captured when a profession window is open and has settled.
 
 Bag and bank item totals are shown in the selected-character overview as item
 names/IDs and counts. Snapshots remain local SavedVariables; WoW addons cannot
