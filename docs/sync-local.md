@@ -8,7 +8,17 @@ The seam is `build_snapshots(root)` in [`tools/sync_export.py`](../tools/sync_ex
 
 ## Running locally
 
-Use Python 3.11+ and run these from the repository root. Replace the SavedVariables path with the exact file for the WoW account you want to sync. Keep the token and database in a private local directory, outside the addon installation and outside Git.
+Use Python 3.11+ with its standard-library `sqlite3` module; no separate SQLite
+server or database package is needed. Run the commands from the repository
+root. Replace the SavedVariables path with the exact file for the WoW account
+and client you want to sync. Keep the token, database, and exported JSON in a
+private local directory, outside the addon installation and outside Git.
+
+First, log out of WoW or use `/reload` so the client writes the latest addon
+state to `GamersTrackerForever.lua`. The companion only reads the persisted
+file; it cannot see unsaved in-memory changes or trigger a reload.
+
+Open a PowerShell terminal for the server and run:
 
 ```powershell
 $syncState = Join-Path $env:LOCALAPPDATA 'GamersTrackerForever\sync-local'
@@ -16,15 +26,35 @@ $savedFile = 'C:\Program Files (x86)\World of Warcraft\_classic_beta_\WTF\Accoun
 python tools/sync_server.py --database (Join-Path $syncState 'snapshots.sqlite3') --token-file (Join-Path $syncState 'token')
 ```
 
-The server command creates a random secret token on first run and remains in the foreground. In another terminal:
+The first run creates the state directory, SQLite database, and a random bearer
+token file. Keep this terminal open; the server runs in the foreground and
+listens only on `127.0.0.1:8765` by default. In a **second PowerShell
+terminal**, from the repository root, define the same state and SavedVariables
+paths (terminal variables are not shared), then start the companion. Adjust the
+account and client folder as needed:
 
 ```powershell
+$syncState = Join-Path $env:LOCALAPPDATA 'GamersTrackerForever\sync-local'
+$savedFile = 'C:\Program Files (x86)\World of Warcraft\_classic_beta_\WTF\Account\YOUR_ACCOUNT\SavedVariables\GamersTrackerForever.lua'
 python tools/sync_export.py --saved-variables $savedFile --output-dir (Join-Path $syncState 'exported') --server-url http://127.0.0.1:8765 --token-file (Join-Path $syncState 'token') --watch-seconds 300
 ```
 
-Without `--watch-seconds`, the companion runs once. Without `--server-url` and `--token-file`, it only writes JSON files. It never edits the game's SavedVariables. It polls at five-minute intervals, but unchanged disk data yields the same server revision. WoW normally flushes new addon data to the file on logout or `/reload`; the companion **does not** trigger a reload. If the game is running, in-memory changes may not be on the server yet.
+Without `--watch-seconds`, the companion runs once. Without `--server-url` and
+`--token-file`, it only writes JSON files. It never edits the game's SavedVariables.
+With `--watch-seconds 300`, it polls every five minutes, but unchanged disk data
+does not create a new server revision. If WoW is running, unsaved in-memory
+changes may not be included yet. Stop either foreground process with Ctrl+C.
 
-To inspect stored documents from a local terminal, send `GET /v1/snapshots` with `Authorization: Bearer <token>`. Do not publish the token or the JSON response. A server response contains `revision`, `contentHash`, `receivedAt`, and `snapshot` for each character.
+SQLite data lives in `snapshots.sqlite3` under the state directory; WAL mode may
+also create `snapshots.sqlite3-wal` and `snapshots.sqlite3-shm` while the server
+is running. The server creates a `character_snapshots` table with one current
+document per owner, product, and character. To verify service-side data, use
+`GET /v1/snapshots` with `Authorization: Bearer <token>` as described below;
+the response includes the stored JSON document. Do not publish the token or
+response.
+
+The `GET /v1/snapshots` response contains `revision`, `contentHash`,
+`receivedAt`, and `snapshot` for each character.
 
 ## Snapshot and storage contract
 

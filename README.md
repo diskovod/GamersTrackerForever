@@ -59,7 +59,9 @@ Enable **GamersTrackerForever** on the character-selection AddOns screen, then u
 - [`docs/forever-beta-probe.md`](docs/forever-beta-probe.md) — safe in-client
   probe procedure.
 - [`docs/sync-local.md`](docs/sync-local.md) — optional local companion/server
-  setup and current sync limitations.
+  setup, embedded SQLite storage, and current sync limitations. Python includes
+  SQLite support, so the prototype does not need a separate database server or
+  SQLite installation.
 
 ## Current validation status
 
