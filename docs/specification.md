@@ -75,9 +75,13 @@ The core must therefore be client-neutral. All version-sensitive calls belong be
 - Store everything locally in account-wide SavedVariables.
 - Provide a compact, expandable Blizzard-style UI.
 - Use a persistent two-pane native UI: a left character selector and a larger
-  right detail/recipes pane. The selector exposes a `Track up to` limit from 1
-  through 10 (default 3), persists the selected character, and never silently
-  untracks existing characters when a limit is reached.
+  right detail/recipes pane. The selected character expands into professions
+  with ranks, and each profession expands into its captured recipes. Selecting
+  a recipe shows icon-and-quantity material cards above a separate per-character
+  holdings panel. Raw bag item-ID lists are not part of the character overview.
+  The selector exposes a `Track up to` limit from 1 through 10 (default 3),
+  persists the selected character, and never silently untracks existing
+  characters when a limit is reached.
 
 ### 4.2 Out of scope
 

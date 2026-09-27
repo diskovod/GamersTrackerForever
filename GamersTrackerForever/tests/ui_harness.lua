@@ -28,6 +28,8 @@ same(characterRows[1].name, "Ana", "characters sort by display name")
 same(characterRows[1].lastSeenLabel, "10s ago", "age formatting")
 same(characterRows[1].bagsFreshness.state, "current", "bag freshness")
 same(characterRows[1].professions[1].recipeScanState, "current", "profession scan state")
+same(characterRows[1].professions[1].recipes[1].name, "Test Potion", "learned recipe appears under profession")
+same(characterRows[1].professions[1].learnedCount, 1, "learned recipe count uses true entries")
 assert(characterRows[1].expanded, "expanded map is projected")
 local pane = GamersTrackerForever.ViewModels.BuildTwoPane(product, { now = 2000, settings = db.settings, productKey = "classic_era", selectedCharacterKey = "ana" })
 same(pane.left.selectedCharacterKey, "ana", "selection is deterministic")
@@ -57,6 +59,10 @@ same(materialRows[1].afterTransferStatus, "stale", "after-transfer status")
 same(GamersTrackerForever.ViewModels.FormatAvailability(calc.availableNow), "short (0 crafts)", "render-ready now summary")
 same(GamersTrackerForever.ViewModels.FormatAvailability(calc.afterTransfer), "stale (2 crafts)", "render-ready transfer summary")
 same(#materialRows[1].characters, 3, "all tracked characters represented, including isolated")
+local specialRows = GamersTrackerForever.ViewModels.BuildMaterialRows(
+  { reagents = { { name = "Anvil", kind = "tool" } } },
+  { reagents = { { itemID = nil, quantity = 1, kind = "special" } } })
+same(specialRows[1].name, "Anvil", "special requirement never renders as Item nil")
 local cell, meta = GamersTrackerForever.ViewModels.FormatMaterialCell(materialRows[1].characters[1], "bank", { date = function(_, stamp) return "DATE:" .. tostring(stamp) end })
 assert(cell:find("bank", 1, true) and meta.tooltip:find("scanned DATE:", 1, true), "snapshot tooltip includes location and exact time")
 
@@ -75,7 +81,14 @@ local function mockFrame()
   function f:SetBackdrop() end; function f:SetBackdropColor() end; function f:SetScrollChild(v) self.child = v end
   function f:SetAutoFocus() end; function f:SetTextInsets() end; function f:SetHighlightTexture() end
   function f:SetText(v) self.text = v end; function f:GetText() return self.text or "" end
-  function f:CreateFontString() return mockFrame() end; function f:CreateTexture() return mockFrame() end
+  function f:SetTexture(v) self.texture = v end
+  function f:CreateFontString() return mockFrame() end
+  function f:CreateTexture()
+    local texture = mockFrame()
+    self.textures = self.textures or {}
+    self.textures[#self.textures + 1] = texture
+    return texture
+  end
   function f:GetPoint() return "CENTER", nil, "CENTER", 0, 0 end
   return f
 end
@@ -93,13 +106,45 @@ _G.UIDropDownMenu_SetText = function(frame, value)
   assert(type(frame) == "table", "UIDropDownMenu_SetText must receive frame first")
   dropdownText = value; frame.dropdownText = value
 end
-local ui = GamersTrackerForever.UI:Create({ env = { time = function() return 2000 end }, repository = repo, catalog = catalog, craftabilityService = service, productKey = "classic_era" })
+local ui = GamersTrackerForever.UI:Create({ env = {
+  time = function() return 2000 end,
+  GetItemInfo = function() return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555 end,
+}, repository = repo, catalog = catalog, craftabilityService = service, productKey = "classic_era" })
 ui:Initialize()
 assert(ui.frame and ui.initialized and ui.title and ui.characterScroll, "mocked-frame UI initializes")
 same(ui.frame.w, 900, "native UI default width")
 same(ui.frame.h, 560, "native UI default height")
 same(dropdownWidth, 92, "dropdown width uses frame-first SoD signature")
 same(dropdownText, "3", "dropdown text uses frame-first SoD signature")
+for _, row in ipairs(ui.detailRows or {}) do
+  assert(not tostring(row.text or ""):find("Saved inventory", 1, true)
+    and not tostring(row.text or ""):find("Item 100", 1, true), "overview must not dump raw inventory")
+end
+ui:ToggleProfession("ana", "alchemy")
+assert(ui.expandedProfessions["ana|alchemy"] and ui.selectedProfessionKey == "alchemy",
+  "profession expands beneath the selected character")
+ui:SelectRecipe("ana", "alchemy", "recipe:1")
+assert(ui.selectedRecipeKey == "recipe:1" and #ui.materialCards == 1,
+  "recipe selection renders a material card")
+same(ui.materialCards[1].textures[1].texture, 555, "material card uses the item texture, not item quality")
+same(#ui.sourceRows, 3, "separate holdings panel includes every tracked character")
+ui:SelectCharacter("ana")
+assert(ui.selectedRecipeKey == nil, "selecting a character returns to its overview")
 ui.tab = "recipes"; ui:Refresh(); assert(ui.recipeScroll and ui.recipeContent, "recipes tab renders")
+
+local beta = repo:GetProduct("forever_beta", true)
+beta.characters.beta = { tracked = true, identity = { displayName = "Beta Crafter" }, level = 20,
+  professions = { smithing = { name = "Blacksmithing", rank = 53, maxRank = 75 } },
+  inventory = { bags = { [100] = 4 }, bagsScannedAt = 2000 } }
+local betaUI = GamersTrackerForever.UI:Create({ env = { time = function() return 2000 end },
+  repository = repo, productKey = "forever_beta", recipesSupported = false })
+betaUI:Initialize()
+betaUI:ToggleProfession("beta", "smithing")
+local sawUnavailable = false
+for _, row in ipairs(betaUI.rows) do
+  if tostring(row.text or ""):find("Recipes unavailable on this client", 1, true) then sawUnavailable = true end
+end
+assert(sawUnavailable and not betaUI.tabs.recipes:IsShown(),
+  "Forever beta shows profession ranks but does not fabricate recipe choices")
 
 print("GamersTrackerForever Task 6 UI/view-model harness: PASS")

@@ -95,6 +95,31 @@ local function createBackdrop(frame)
   end
 end
 
+local function resolveItem(self, itemID)
+  local env = self.env or _G
+  local name, link, icon
+  if type(env.GetItemInfo) == "function" then
+    local ok, itemName, itemLink, _, _, _, _, _, _, _, itemIcon = pcall(env.GetItemInfo, itemID)
+    if ok then name, link, icon = itemName, itemLink, itemIcon end
+  end
+  if not icon and type(env.GetItemIcon) == "function" then
+    local ok, value = pcall(env.GetItemIcon, itemID)
+    if ok then icon = value end
+  end
+  local itemAPI = env.C_Item
+  if not icon and type(itemAPI) == "table" and type(itemAPI.GetItemIconByID) == "function" then
+    local ok, value = pcall(itemAPI.GetItemIconByID, itemID)
+    if ok then icon = value end
+  end
+  return name, link, icon or "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
+local function setIcon(texture, value)
+  if texture and type(texture.SetTexture) == "function" then
+    texture:SetTexture(value or "Interface\\Icons\\INV_Misc_QuestionMark")
+  end
+end
+
 local function hideRows(rows)
   for _, row in ipairs(rows or {}) do if row.Hide then row:Hide() end end
 end
@@ -106,8 +131,9 @@ function UI:Create(options)
     api = options.api, productKey = options.productKey, getGeometry = options.getGeometry, setGeometry = options.setGeometry,
     professionsSupported = options.professionsSupported ~= false,
     recipesSupported = options.recipesSupported ~= false,
-    expandedCharacters = {}, expandedRecipes = {}, tab = "characters", rows = {}, recipeRows = {}, initialized = false,
-    selectedCharacterKey = options.selectedCharacterKey, statusMessage = nil }, UI)
+    expandedCharacters = {}, expandedProfessions = {}, expandedRecipes = {}, tab = "characters", rows = {}, recipeRows = {}, initialized = false,
+    selectedCharacterKey = options.selectedCharacterKey, selectedProfessionKey = nil, selectedRecipeKey = nil,
+    statusMessage = nil }, UI)
   return self
 end
 
@@ -163,8 +189,8 @@ function UI:Initialize(dependencies)
   charactersTab:SetScript("OnClick", function() self.tab = "characters"; self:Refresh() end)
   recipesTab:SetScript("OnClick", function() self.tab = "recipes"; self:Refresh() end)
   self.body = CreateFrame("Frame", nil, frame); self.body:SetPoint("TOPLEFT", 10, -72); self.body:SetPoint("BOTTOMRIGHT", -10, 10)
-  self.leftPane = CreateFrame("Frame", nil, self.body); self.leftPane:SetPoint("TOPLEFT", 0, 0); self.leftPane:SetPoint("BOTTOMLEFT", 0, 0); self.leftPane:SetWidth(210)
-  self.leftTitle = label(self.leftPane, "GameFontNormal", "TOPLEFT", self.leftPane, 6, -4, 190, 20); self.leftTitle:SetText("Characters")
+  self.leftPane = CreateFrame("Frame", nil, self.body); self.leftPane:SetPoint("TOPLEFT", 0, 0); self.leftPane:SetPoint("BOTTOMLEFT", 0, 0); self.leftPane:SetWidth(250)
+  self.leftTitle = label(self.leftPane, "GameFontNormal", "TOPLEFT", self.leftPane, 6, -4, 225, 20); self.leftTitle:SetText("Characters · Professions")
   self.trackLimitLabel = label(self.leftPane, "GameFontNormalSmall", "TOPLEFT", self.leftPane, 6, -27, 82, 20); self.trackLimitLabel:SetText("Track up to")
   self.trackLimitDropdown = CreateFrame("Frame", "GamersTrackerForeverTrackLimit", self.leftPane, "UIDropDownMenuTemplate")
   self.trackLimitDropdown:SetPoint("TOPLEFT", 82, -20)
@@ -172,7 +198,7 @@ function UI:Initialize(dependencies)
   if type(UIDropDownMenu_SetWidth) == "function" then UIDropDownMenu_SetWidth(self.trackLimitDropdown, 92) end
   self.characterScroll = CreateFrame("ScrollFrame", nil, self.leftPane, "UIPanelScrollFrameTemplate")
   self.characterScroll:SetPoint("TOPLEFT", 2, -54); self.characterScroll:SetPoint("BOTTOMRIGHT", -16, 0)
-  self.characterContent = CreateFrame("Frame", nil, self.characterScroll); self.characterContent:SetSize(190, 1); self.characterScroll:SetScrollChild(self.characterContent)
+  self.characterContent = CreateFrame("Frame", nil, self.characterScroll); self.characterContent:SetSize(228, 1); self.characterScroll:SetScrollChild(self.characterContent)
   self.rightPane = CreateFrame("Frame", nil, self.body); self.rightPane:SetPoint("TOPLEFT", self.leftPane, "TOPRIGHT", 8, 0); self.rightPane:SetPoint("BOTTOMRIGHT", 0, 0)
   self.detailScroll = CreateFrame("ScrollFrame", nil, self.rightPane, "UIPanelScrollFrameTemplate"); self.detailScroll:SetPoint("TOPLEFT", 2, 0); self.detailScroll:SetPoint("BOTTOMRIGHT", -16, 0)
   self.detailContent = CreateFrame("Frame", nil, self.detailScroll); self.detailContent:SetSize(500, 1); self.detailScroll:SetScrollChild(self.detailContent)
@@ -283,18 +309,66 @@ function UI:RefreshCharacters(productKey, product)
     if selected ~= nil and tostring(row.key) == tostring(selected) then selectionExists = true; break end
   end
   if not selectionExists and pane.characters[1] then selected = pane.characters[1].key end
+  if tostring(self.selectedCharacterKey or "") ~= tostring(selected or "") then
+    self.selectedProfessionKey, self.selectedRecipeKey = nil, nil
+  end
   self.selectedCharacterKey = selected
   if self.repository and self.repository.SetSelectedCharacterKey then self.repository:SetSelectedCharacterKey(selected) end
   self.trackedHeader:SetText(pane.header)
   if self.trackLimitLabel then self.trackLimitLabel:SetText("Track up to") end
   local y, contentHeight = -4, 0
+  local function addTreeRow(caption, indent, height, onClick, font)
+    height = height or 24
+    local width = math.max(1, 225 - indent)
+    if onClick then
+      local row = CreateFrame("Button", nil, self.characterContent)
+      row:SetPoint("TOPLEFT", 2 + indent, y); row:SetSize(width, height)
+      local line = label(row, font or "GameFontNormalSmall", "LEFT", row, 3, 0, width - 4, height)
+      line:SetText(caption)
+      row:SetScript("OnClick", onClick)
+      self.rows[#self.rows + 1] = row
+    else
+      local line = label(self.characterContent, font or "GameFontDisableSmall", "TOPLEFT", self.characterContent,
+        5 + indent, y, width - 4, height)
+      line:SetText(caption)
+      self.rows[#self.rows + 1] = line
+    end
+    y = y - height - 2; contentHeight = contentHeight + height + 2
+  end
   for _, model in ipairs(pane.characters) do
-    local row = CreateFrame("Button", nil, self.characterContent); row:SetPoint("TOPLEFT", 2, y); row:SetSize(188, 30); self.rows[#self.rows + 1] = row
-    local marker = model.selected and "> " or "  "
+    local isSelected = tostring(model.key) == tostring(selected)
+    local marker = isSelected and "v " or "> "
     local state = model.tracked and "tracked" or "available"
-    local line = label(row, "GameFontNormalSmall", "LEFT", row, 3, 0, 184, 28); line:SetText(marker .. model.name .. " L" .. tostring(model.level) .. " [" .. state .. "]")
-    row:SetScript("OnClick", function() self:SelectCharacter(model.key) end)
-    y = y - 32; contentHeight = contentHeight + 32
+    addTreeRow(marker .. model.name .. " L" .. tostring(model.level) .. " [" .. state .. "]", 0, 28,
+      function() self:SelectCharacter(model.key) end)
+    if isSelected then
+      if not self.professionsSupported then
+        addTreeRow("Professions unavailable", 14)
+      elseif #(model.professions or {}) == 0 then
+        addTreeRow("No professions captured yet", 14)
+      else
+        for _, profession in ipairs(model.professions) do
+          local treeKey = tostring(model.key) .. "|" .. tostring(profession.key)
+          local expanded = self.expandedProfessions[treeKey] == true
+          addTreeRow((expanded and "v " or "> ") .. profession.name .. " " .. tostring(profession.rank)
+            .. "/" .. tostring(profession.maxRank), 12, 25,
+            function() self:ToggleProfession(model.key, profession.key) end)
+          if expanded then
+            if not self.recipesSupported then
+              addTreeRow("Recipes unavailable on this client", 27, 30)
+            elseif #(profession.recipes or {}) == 0 then
+              addTreeRow("No recipes captured yet", 27)
+            else
+              for _, recipe in ipairs(profession.recipes) do
+                local selectedRecipe = tostring(self.selectedRecipeKey or "") == tostring(recipe.key)
+                addTreeRow((selectedRecipe and "• " or "  ") .. recipe.name, 27, 24,
+                  function() self:SelectRecipe(model.key, profession.key, recipe.key) end)
+              end
+            end
+          end
+        end
+      end
+    end
   end
   if #pane.characters == 0 then
     local empty = label(self.characterContent, "GameFontDisableSmall", "TOPLEFT", self.characterContent, 6, -6, 180, 36)
@@ -307,50 +381,214 @@ function UI:RefreshCharacters(productKey, product)
 end
 
 function UI:SelectCharacter(characterKey)
+  self.selectedProfessionKey, self.selectedRecipeKey = nil, nil
   self.selectedCharacterKey = characterKey
   if self.repository and type(self.repository.SetSelectedCharacterKey) == "function" then self.repository:SetSelectedCharacterKey(characterKey) end
   self:Refresh()
 end
 
+function UI:ToggleProfession(characterKey, professionKey)
+  self.selectedCharacterKey = characterKey
+  local treeKey = tostring(characterKey) .. "|" .. tostring(professionKey)
+  self.expandedProfessions[treeKey] = not self.expandedProfessions[treeKey]
+  self.selectedProfessionKey, self.selectedRecipeKey = professionKey, nil
+  self.tab = "characters"
+  self:Refresh()
+end
+
+function UI:SelectRecipe(characterKey, professionKey, recipeKey)
+  self.selectedCharacterKey, self.selectedProfessionKey, self.selectedRecipeKey = characterKey, professionKey, recipeKey
+  self.expandedProfessions[tostring(characterKey) .. "|" .. tostring(professionKey)] = true
+  self.tab = "characters"
+  self:Refresh()
+end
+
+function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, width, settings)
+  local recipe = product.recipes and product.recipes[recipeRow.key]
+  local icon = self.detailContent:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(38, 38); icon:SetPoint("TOPLEFT", self.detailContent, 8, y)
+  setIcon(icon, recipe and recipe.icon or recipeRow.icon)
+  self.detailRows[#self.detailRows + 1] = icon
+  local title = label(self.detailContent, "GameFontHighlightLarge", "TOPLEFT", self.detailContent, 52, y,
+    width - 58, 22)
+  title:SetText(recipeRow.name); self.detailRows[#self.detailRows + 1] = title
+  local subtitle = label(self.detailContent, "GameFontNormalSmall", "TOPLEFT", self.detailContent, 52, y - 23,
+    width - 58, 18)
+  subtitle:SetText(profession.name .. " " .. tostring(profession.rank) .. "/" .. tostring(profession.maxRank))
+  self.detailRows[#self.detailRows + 1] = subtitle
+  y = y - 50
+  if type(recipe) ~= "table" then
+    local missing = label(self.detailContent, "GameFontDisableSmall", "TOPLEFT", self.detailContent, 8, y, width - 16, 30)
+    missing:SetText("Recipe details have not been captured yet.")
+    self.detailRows[#self.detailRows + 1] = missing
+    return y - 40
+  end
+  local calcOptions = { currentCharacterKey = character.key, transferGroup = character.transferGroup,
+    now = now(self.env), settings = settings }
+  local calc = GTF.ViewModels.GetRecipeCalculation(self.craftability, recipe, product, calcOptions)
+  local summary = label(self.detailContent, "GameFontNormalSmall", "TOPLEFT", self.detailContent, 8, y, width - 16, 20)
+  summary:SetText("Now: " .. GTF.ViewModels.FormatAvailability(calc and calc.availableNow)
+    .. "  |  After transfer: " .. GTF.ViewModels.FormatAvailability(calc and calc.afterTransfer))
+  self.detailRows[#self.detailRows + 1] = summary
+  y = y - 28
+  local materialTitle = label(self.detailContent, "GameFontHighlight", "TOPLEFT", self.detailContent, 8, y, width - 16, 20)
+  materialTitle:SetText("Materials needed")
+  self.detailRows[#self.detailRows + 1] = materialTitle
+  y = y - 24
+  if not calc then
+    calc = { reagents = {} }
+    for _, reagent in ipairs(recipe.reagents or {}) do
+      calc.reagents[#calc.reagents + 1] = { itemID = reagent.itemID, quantity = reagent.quantity,
+        kind = reagent.kind, status = "unknown" }
+    end
+  end
+  local materialRows = GTF.ViewModels.BuildMaterialRows(recipe, calc, {
+    itemResolver = function(itemID) return resolveItem(self, itemID) end,
+  })
+  self.materialCards = {}
+  if #materialRows == 0 then
+    local empty = label(self.detailContent, "GameFontDisableSmall", "TOPLEFT", self.detailContent, 8, y, width - 16, 24)
+    empty:SetText(type(recipe.reagents) == "table" and "No materials required." or "Material details are unavailable.")
+    self.detailRows[#self.detailRows + 1] = empty
+    return y - 30
+  end
+  local columns = width >= 480 and 2 or 1
+  local cardWidth = columns == 2 and math.floor((width - 24) / 2) or width - 16
+  for index, material in ipairs(materialRows) do
+    local column = (index - 1) % columns
+    local rowIndex = math.floor((index - 1) / columns)
+    local card = CreateFrame("Frame", nil, self.detailContent)
+    card:SetPoint("TOPLEFT", self.detailContent, 8 + column * (cardWidth + 8), y - rowIndex * 55)
+    card:SetSize(cardWidth, 50)
+    local materialIcon = card:CreateTexture(nil, "ARTWORK")
+    materialIcon:SetSize(32, 32); materialIcon:SetPoint("TOPLEFT", card, 2, -5)
+    setIcon(materialIcon, material.icon)
+    local name = label(card, "GameFontNormalSmall", "TOPLEFT", card, 40, -3, cardWidth - 42, 20)
+    name:SetText(material.name)
+    local count = label(card, "GameFontHighlightSmall", "TOPLEFT", card, 40, -23, cardWidth - 42, 20)
+    count:SetText(tostring(material.nowOwned or 0) .. "/" .. tostring(material.required) .. " in bags · "
+      .. text(material.nowStatus, "unknown"))
+    self.detailRows[#self.detailRows + 1] = card
+    self.materialCards[#self.materialCards + 1] = card
+  end
+  y = y - math.ceil(#materialRows / columns) * 55 - 10
+  local ok, panel = pcall(CreateFrame, "Frame", nil, self.detailContent, "BackdropTemplate")
+  panel = ok and panel or CreateFrame("Frame", nil, self.detailContent)
+  panel:SetPoint("TOPLEFT", self.detailContent, 8, y); panel:SetWidth(width - 16)
+  createBackdrop(panel)
+  self.detailRows[#self.detailRows + 1] = panel
+  self.sourceRows = {}
+  local py = -10
+  local heading = label(panel, "GameFontHighlight", "TOPLEFT", panel, 10, py, width - 36, 20)
+  heading:SetText("Who has the materials")
+  py = py - 26
+  for _, material in ipairs(materialRows) do
+    local materialHeading = label(panel, "GameFontNormalSmall", "TOPLEFT", panel, 10, py, width - 36, 18)
+    materialHeading:SetText(material.name .. " · need " .. tostring(material.required))
+    py = py - 19
+    if #(material.characters or {}) == 0 then
+      local unavailable = label(panel, "GameFontDisableSmall", "TOPLEFT", panel, 20, py, width - 46, 17)
+      unavailable:SetText("Character holdings unavailable")
+      py = py - 19
+    else
+      for _, characterRow in ipairs(material.characters) do
+        local row = CreateFrame("Button", nil, panel)
+        row:SetPoint("TOPLEFT", panel, 20, py); row:SetSize(width - 46, 18)
+        local bags, bagsMeta = GTF.ViewModels.FormatMaterialCell(characterRow, "bags", self.env)
+        local bank, bankMeta = GTF.ViewModels.FormatMaterialCell(characterRow, "bank", self.env)
+        local caption = label(row, "GameFontDisableSmall", "LEFT", row, 0, 0, width - 46, 18)
+        caption:SetText(text(characterRow.displayName, characterRow.characterKey) .. ": " .. bags .. ", " .. bank
+          .. (characterRow.included and "" or " · not pooled"))
+        row:SetScript("OnEnter", function()
+          if GameTooltip and GameTooltip.SetOwner then
+            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(text(characterRow.displayName, characterRow.characterKey))
+            GameTooltip:AddLine(bagsMeta.tooltip or text(bags))
+            GameTooltip:AddLine(bankMeta.tooltip or text(bank))
+            GameTooltip:Show()
+          end
+        end)
+        row:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+        self.sourceRows[#self.sourceRows + 1] = row
+        py = py - 19
+      end
+    end
+    py = py - 7
+  end
+  panel:SetHeight(math.max(54, -py + 8))
+  return y - panel:GetHeight() - 10
+end
+
 function UI:RefreshDetail(productKey, product, characterKey)
-  hideRows(self.detailRows); self.detailRows = {}
+  hideRows(self.detailRows); self.detailRows = {}; self.materialCards = {}; self.sourceRows = {}
   local settings = self.repository and self.repository.db and self.repository.db.settings or {}
-  local model = GTF.ViewModels.BuildCharacterDetail(product, characterKey, { now = now(self.env), settings = settings,
-    itemResolver = function(itemID) if self.env and type(self.env.GetItemInfo) == "function" then return self.env.GetItemInfo(itemID) end end })
+  local model = GTF.ViewModels.BuildCharacterDetail(product, characterKey, {
+    now = now(self.env), settings = settings, includeInventoryRows = false,
+  })
+  local width = 500
+  if self.rightPane and type(self.rightPane.GetWidth) == "function" then
+    local available = tonumber(self.rightPane:GetWidth()) or 0
+    if available > 200 then width = math.max(350, available - 24) end
+  end
+  self.detailContent:SetWidth(width)
   local y = -6
   local function add(caption, font)
-    local fs = label(self.detailContent, font or "GameFontNormal", "TOPLEFT", self.detailContent, 8, y, 520, 20); fs:SetText(caption); self.detailRows[#self.detailRows + 1] = fs; y = y - 21
+    local fs = label(self.detailContent, font or "GameFontNormal", "TOPLEFT", self.detailContent, 8, y,
+      width - 16, 20)
+    fs:SetText(caption); self.detailRows[#self.detailRows + 1] = fs; y = y - 23
   end
-  if model.empty then add(model.title or "No character selected", "GameFontHighlight"); add(model.message or "Select a character from the list.", "GameFontNormalSmall"); self.detailContent:SetHeight(80); return end
-  add(model.name .. " — level " .. tostring(model.level) .. " " .. text(model.className, "class unknown"), "GameFontHighlightLarge")
-  add(text(model.realm, "Realm unknown") .. " | " .. text(model.faction, "Faction unknown") .. " | " .. (model.tracked and "tracked" or "not tracked"))
-  add("Last seen: " .. GTF.ViewModels.FormatTimestamp(model.lastSeenAt, self.env) .. " | Bags: " .. model.bagsFreshness.label .. " | Bank: " .. model.bankFreshness.label, "GameFontNormalSmall")
-  local track = button(self.detailContent, model.tracked and "Untrack" or "Track", 86, 22); track:SetPoint("TOPLEFT", 8, y - 2); track:SetScript("OnClick", function() local ok, err = self:SetTracked(model.key, not model.tracked); self.statusMessage = ok and nil or err; self:Refresh() end); self.detailRows[#self.detailRows + 1] = track
-  local forget = button(self.detailContent, "Forget", 70, 22); forget:SetPoint("LEFT", track, "RIGHT", 5, 0); forget:SetScript("OnClick", function() self:ConfirmForget(productKey, model.key, model.name) end); self.detailRows[#self.detailRows + 1] = forget
-  y = y - 30; add("Professions", "GameFontHighlight")
-  if not self.professionsSupported then
-    add("Profession and recipe scanning is not enabled on this client.", "GameFontDisableSmall")
-  elseif #(model.professions or {}) == 0 then
-    add("No profession data saved yet. Open a profession window to scan it.", "GameFontDisableSmall")
-  else
-    for _, profession in ipairs(model.professions or {}) do
-      add(profession.name .. " " .. tostring(profession.rank) .. "/" .. tostring(profession.maxRank) .. " — recipes " .. profession.recipeScanState, "GameFontNormalSmall")
+  if model.empty then
+    add(model.title or "No character selected", "GameFontHighlight")
+    add(model.message or "Select a character from the list.", "GameFontNormalSmall")
+    self.detailContent:SetHeight(80)
+    return
+  end
+  local classLabel = model.className and model.className ~= "" and (" " .. model.className) or ""
+  add(model.name .. " — level " .. tostring(model.level) .. classLabel, "GameFontHighlightLarge")
+  add(text(model.realm, "Realm unknown") .. " | " .. text(model.faction, "Faction unknown") .. " | "
+    .. (model.tracked and "tracked" or "not tracked"))
+  add("Last seen: " .. GTF.ViewModels.FormatTimestamp(model.lastSeenAt, self.env) .. " | Bags: "
+    .. model.bagsFreshness.label .. " | Bank: " .. model.bankFreshness.label, "GameFontNormalSmall")
+  local track = button(self.detailContent, model.tracked and "Untrack" or "Track", 86, 22)
+  track:SetPoint("TOPLEFT", 8, y - 2)
+  track:SetScript("OnClick", function()
+    local ok, err = self:SetTracked(model.key, not model.tracked)
+    self.statusMessage = ok and nil or err
+    self:Refresh()
+  end)
+  self.detailRows[#self.detailRows + 1] = track
+  local forget = button(self.detailContent, "Forget", 70, 22)
+  forget:SetPoint("LEFT", track, "RIGHT", 5, 0)
+  forget:SetScript("OnClick", function() self:ConfirmForget(productKey, model.key, model.name) end)
+  self.detailRows[#self.detailRows + 1] = forget
+  y = y - 35
+  local selectedProfession, selectedRecipe
+  for _, profession in ipairs(model.professions or {}) do
+    if tostring(profession.key) == tostring(self.selectedProfessionKey) then
+      selectedProfession = profession
+      for _, recipe in ipairs(profession.recipes or {}) do
+        if tostring(recipe.key) == tostring(self.selectedRecipeKey) then selectedRecipe = recipe; break end
+      end
+      break
     end
   end
-  add("Saved inventory", "GameFontHighlight")
-  if #model.inventoryRows == 0 then
-    local bags = model.bagsFreshness and model.bagsFreshness.state or "never"
-    local bank = model.bankFreshness and model.bankFreshness.state or "never"
-    if bags == "never" and bank == "never" then
-      add("No bag or bank scan saved yet. Open the bags (and bank) to capture inventory.", "GameFontDisableSmall")
-    elseif bags == "never" then
-      add("No readable bag items saved yet. Open the bags to capture inventory.", "GameFontDisableSmall")
-    elseif bank == "never" then
-      add("Bags were scanned and are empty; bank has never been scanned.", "GameFontDisableSmall")
+  if self.selectedRecipeKey and not selectedRecipe then self.selectedRecipeKey = nil end
+  if selectedRecipe then
+    y = self:RenderRecipeDetail(product, model, selectedProfession, selectedRecipe, y, width, settings)
+  elseif selectedProfession then
+    add(selectedProfession.name .. " " .. tostring(selectedProfession.rank) .. "/"
+      .. tostring(selectedProfession.maxRank), "GameFontHighlight")
+    if not self.recipesSupported then
+      add("Recipe capture is not yet supported on this client.", "GameFontDisableSmall")
+    elseif #(selectedProfession.recipes or {}) == 0 then
+      add("No recipes captured yet. Open this profession in game to scan it.", "GameFontDisableSmall")
     else
-      add("The last bag and bank scans were empty.", "GameFontDisableSmall")
+      add("Choose a recipe under this profession on the left.", "GameFontNormalSmall")
     end
-  else for _, item in ipairs(model.inventoryRows) do add(item.name .. " (ID " .. tostring(item.itemID) .. "): bags " .. tostring(item.bags) .. ", bank " .. tostring(item.bank) .. ", total " .. tostring(item.total), "GameFontNormalSmall") end end
+  else
+    add("Select a profession on the left to browse its recipes.", "GameFontNormalSmall")
+    add("Bag snapshots are saved and shown when a recipe needs their materials.", "GameFontDisableSmall")
+  end
   if self.statusMessage then add(self.statusMessage, "GameFontHighlight") end
   self.detailContent:SetHeight(math.max(120, -y + 20))
 end
@@ -366,7 +604,15 @@ function UI:ConfirmForget(productKey, characterKey, displayName)
   local function forget()
     if self.characterService and type(self.characterService.Forget) == "function" then self.characterService:Forget(productKey, characterKey)
     elseif self.repository and type(self.repository.ForgetCharacter) == "function" then self.repository:ForgetCharacter(productKey, characterKey) end
-    self.expandedCharacters[characterKey] = nil; self:Refresh()
+    self.expandedCharacters[characterKey] = nil
+    local prefix = tostring(characterKey) .. "|"
+    for key in pairs(self.expandedProfessions) do
+      if key:sub(1, #prefix) == prefix then self.expandedProfessions[key] = nil end
+    end
+    if tostring(self.selectedCharacterKey or "") == tostring(characterKey) then
+      self.selectedCharacterKey, self.selectedProfessionKey, self.selectedRecipeKey = nil, nil, nil
+    end
+    self:Refresh()
   end
   if type(StaticPopupDialogs) == "table" and type(StaticPopup_Show) == "function" then
     local name = "GAMERSTRACKERFOREVER_FORGET"

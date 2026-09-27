@@ -5,11 +5,11 @@ Scope: installed beta client, user-supplied `/gtf status` and `/gtf probe` outpu
 
 ## Executive result
 
-The installed client is `wow_classic_beta`; its executable is now build `1.60.1.70009`. The user's in-game probe on the earlier `69913` build reported interface `16001` and project `1`. A separate `forever_beta` adapter now saves character level, profession ranks, and bag snapshots when that interface/project shape is present. The addon declares interfaces `11509, 16001`; the current build's in-game interface and UI persistence still need verification.
+The installed client is `wow_classic_beta`; its executable is now build `1.60.1.70009`. In-game probes reported interface `16001` and project `1` on this build. A separate `forever_beta` adapter saves character level, profession ranks, and bag snapshots when that interface/project shape is present. The addon declares interfaces `11509, 16001`. The native UI was seen in game; layout and interaction changes still need visual retesting.
 
 The user's in-game probe found `C_Container` with 44/44 readable bag slots and 129 items, plus four readable profession entries. It found no legacy trade-skill line/count APIs and no accessible bank. The previous no-addon crash report predates this runtime probe; its graphics assertion is not evidence of an addon Lua failure.
 
-The source already contains the requested native WoW split UI: a character list and tracking-limit dropdown on the left, and a larger detail/recipe pane on the right. It does not use HTML. Whether those native templates and APIs are present with the beta build remains a runtime gate.
+The addon uses native WoW frames, not HTML. The beta screenshot showed the split window and `Track up to` selector. The new tree puts professions and captured recipes under the selected character; selecting a recipe opens material cards and a separate per-character holdings panel on the right. Beta recipe rows remain unavailable until recipe scanning passes the compatibility gate.
 
 ## Primary client evidence
 
@@ -60,7 +60,7 @@ The read-only compatibility probe now samples at most three numeric recipe IDs f
 
 The dispatcher creates a native `Frame`, registers the addon's event list, and installs an `OnEvent` script (`EventDispatcher.lua:35-55`). The UI uses native `CreateFrame`, `BackdropTemplate` with a fallback, `UIPanelButtonTemplate`, `InputBoxTemplate`, `UIPanelScrollFrameTemplate`, and `UIDropDownMenuTemplate` (`UI.lua:74-96,121-180`). There is no HTML widget or browser/HTML markup in the addon source; `rg` finds no HTML/browser usage under the addon directory. The beta client does contain a `UTILS\BlizzardBrowser.exe`, but no local evidence shows that WoW addon Lua can embed it. Treat “HTML UI inside the addon” as unsupported/unverified; use native frames for the in-game panel.
 
-The requested split is already represented in source: `UI.lua:160-176` creates `leftPane` (210 px), `rightPane`, scrollable character content, and larger detail/recipe content. The left side labels the control `Track up to` and uses `UIDropDownMenuTemplate` at `:162-178`; rows show each character and tracked/available state at `:273-283`. This needs beta runtime visual verification, not a new HTML layer.
+The UI creates a 250 px left pane with the `Track up to` selector, scrollable characters, expandable professions, and nested recipe choices. The larger right pane shows an overview until a recipe is selected, then material icons/counts above a distinct holdings panel. Saved bag items are no longer rendered as a raw item-ID list. Beta runtime visual verification is still needed for the changed layout.
 
 ## Where bag data is saved
 
@@ -73,8 +73,8 @@ Therefore the expected on-disk location, after a successful logout/reload, is th
 - [x] Install the addon into the beta client's `Interface\AddOns`; the user ran `/gtf status` and `/gtf probe` on build `69913`.
 - [x] Confirm interface `16001` in-game on build `69913` and declare both TOC interfaces. Recheck the current `70009` build.
 - [x] Capture `GetBuildInfo()` and project markers through `/gtf probe`; fail closed on unknown product/build shape.
-- [ ] Confirm `CreateFrame`, `BackdropTemplate`, `UIPanelScrollFrameTemplate`, and `UIDropDownMenuTemplate` instantiate without errors.
-- [ ] Confirm the two-pane UI is visible, resizable, scrollable, and the tracking-limit dropdown persists a value of 1–3 (or the chosen maximum).
+- [x] Confirm the native two-pane window and `Track up to` dropdown instantiate in the beta client.
+- [ ] Retest the expanded profession tree, resizing, scrolling, and tracking-limit persistence after the UI change.
 - [x] Confirm `C_Container` on build `69913` with 44/44 readable slots and 129 counted items; compare those totals against live bags after deploying this build.
 - [x] Confirm `/reload` bag persistence: the bag timestamp advanced and the Forever partition was written.
 - [ ] Open and close a bank, verify `BANKFRAME_OPENED` and `BANKFRAME_CLOSED`, and ensure the bank snapshot is not overwritten with an empty inaccessible cache.

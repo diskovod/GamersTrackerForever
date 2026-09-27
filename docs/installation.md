@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.2 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.3 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.2.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.3.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -17,10 +17,12 @@
 - `/gtf minimap on|off|toggle` controls the optional minimap button (enabled by default); the same subcommands work through `/act`.
 - The key binding is **Toggle GamersTrackerForever**.
 - Use `/reload` after changing the addon files. The addon never forces a reload.
-- The native window keeps all discovered characters in a left selector and the
-  selected character overview/recipes in a larger right pane. Use `Track up to`
-  to choose 1–10 tracked characters (default 3); a full limit reports a status
-  message and does not untrack anyone automatically.
+- The native window lists characters on the left. Select one to reveal its
+  professions and ranks, expand a profession to browse captured recipes, then
+  select a recipe to see material icons and quantities on the right. A separate
+  panel below shows each tracked character's last-known bag/bank holdings.
+  Use `Track up to` to choose 1–10 tracked characters (default 3); a full limit
+  does not untrack anyone automatically.
 
 ## Data and freshness
 
@@ -34,8 +36,9 @@ bag events, every ten minutes, and during logout. Bank data scans only while
 the bank is accessible and remains last-known after closing the bank. Learned
 recipes are captured when a profession window is open and has settled.
 
-Bag and bank item totals are shown in the selected-character overview as item
-names/IDs and counts. Snapshots remain local SavedVariables; WoW addons cannot
+Bag and bank item totals are kept for recipe material comparisons, not shown
+as a raw inventory dump in the character overview. Snapshots remain local
+SavedVariables; WoW addons cannot
 make arbitrary HTTP requests or write arbitrary files. A future server needs an
 explicit export after WoW flushes SavedVariables plus a companion desktop
 uploader (or another approved bridge).

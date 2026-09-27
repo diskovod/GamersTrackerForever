@@ -143,6 +143,22 @@ function ViewModels.BuildCharacters(product, options)
       local professionRows = {}
       for professionKey, profession in pairs(character.professions or {}) do
         if type(profession) == "table" then
+          local learnedRecipes = {}
+          for recipeKey, learned in pairs(profession.learnedRecipes or {}) do
+            if learned == true then
+              local recipe = (product.recipes or {})[recipeKey]
+              learnedRecipes[#learnedRecipes + 1] = {
+                key = recipeKey,
+                name = text(recipe and recipe.name, "Recipe " .. tostring(recipeKey)),
+                icon = recipe and recipe.icon or nil,
+                definitionAvailable = type(recipe) == "table",
+              }
+            end
+          end
+          table.sort(learnedRecipes, function(a, b)
+            local an, bn = lower(a.name), lower(b.name)
+            return an == bn and tostring(a.key) < tostring(b.key) or an < bn
+          end)
           professionRows[#professionRows + 1] = {
             key = professionKey, professionID = number(profession.professionID, 0),
             name = text(profession.name, "Unknown profession"), rank = number(profession.rank, 0),
@@ -150,7 +166,7 @@ function ViewModels.BuildCharacters(product, options)
             recipeScanState = text(profession.scanState, "never"),
             skillFreshness = ViewModels.Freshness(profession.skillScannedAt, now, settings),
             recipesFreshness = ViewModels.Freshness(profession.recipesScannedAt, now, settings),
-            learnedCount = type(profession.learnedRecipes) == "table" and #mapKeys(profession.learnedRecipes) or 0,
+            learnedCount = #learnedRecipes, recipes = learnedRecipes,
           }
         end
       end
@@ -170,7 +186,7 @@ function ViewModels.BuildCharacters(product, options)
         bagsScannedAt = number(inventory.bagsScannedAt, 0), bankScannedAt = number(inventory.bankScannedAt, 0),
         expanded = options.expanded and options.expanded[key] == true or false,
         selected = tostring(selectedKey or "") == tostring(key),
-        inventoryRows = ViewModels.BuildInventoryRows(character, options),
+        inventoryRows = options.includeInventoryRows == false and {} or ViewModels.BuildInventoryRows(character, options),
       }
     end
   end
@@ -183,7 +199,7 @@ function ViewModels.BuildCharacterSelector(product, options)
   local rows = ViewModels.BuildCharacters(product, {
     now = options.now, settings = settings, productKey = options.productKey,
     includeUntracked = true, selectedCharacterKey = options.selectedCharacterKey or settings.selectedCharacterKey,
-    itemResolver = options.itemResolver,
+    itemResolver = options.itemResolver, includeInventoryRows = false,
   })
   local tracked = 0
   for _, row in ipairs(rows) do if row.tracked then tracked = tracked + 1 end end
@@ -203,7 +219,8 @@ function ViewModels.BuildCharacterDetail(product, characterKey, options)
       message = "Select a discovered character from the list." }
   end
   local rows = ViewModels.BuildCharacters(product, { now = options.now, settings = options.settings,
-    includeUntracked = true, selectedCharacterKey = characterKey, itemResolver = options.itemResolver })
+    includeUntracked = true, selectedCharacterKey = characterKey, itemResolver = options.itemResolver,
+    includeInventoryRows = options.includeInventoryRows })
   for _, row in ipairs(rows) do if tostring(row.key) == tostring(characterKey) then
     row.empty = false; row.overview = { name = row.name, realm = row.realm, level = row.level,
       className = row.className, faction = row.faction, lastSeenAt = row.lastSeenAt,
@@ -259,7 +276,13 @@ function ViewModels.BuildMaterialRows(recipe, calculation, options)
   local rows, calculated = {}, calculation.reagents or {}
   for index, reagent in ipairs(calculated) do
     local source = reagent.requirement or (recipe.reagents and recipe.reagents[index]) or {}
-    local name, link, icon = itemInfo(reagent.itemID, options.itemResolver)
+    local name, link, icon
+    if reagent.itemID then
+      name, link, icon = itemInfo(reagent.itemID, options.itemResolver)
+      if name == "Item " .. tostring(reagent.itemID) and source.name then name = source.name end
+    else
+      name, icon = text(source.name, "Special requirement"), source.icon
+    end
     local after = reagent.afterTransfer or {}
     local now = reagent.availableNow or {}
     rows[#rows + 1] = {
