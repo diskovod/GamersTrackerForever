@@ -108,9 +108,13 @@ _G.UIDropDownMenu_SetText = function(frame, value)
   assert(type(frame) == "table", "UIDropDownMenu_SetText must receive frame first")
   dropdownText = value; frame.dropdownText = value
 end
-local tooltipLink, tooltipHidden, comparedTooltip
+local tooltipLink, tooltipHidden, comparedTooltip, tooltipOwner, tooltipAnchor
 _G.GameTooltip = {
-  SetOwner = function() end,
+  SetOwner = function(_, owner, anchor) tooltipOwner = owner; tooltipAnchor = anchor end,
+  ClearAllPoints = function() end,
+  SetPoint = function(_, point, relativeFrame, relativePoint, x, y)
+    tooltipAnchor = { point, relativeFrame, relativePoint, x, y }
+  end,
   SetHyperlink = function(_, link) tooltipLink = link end,
   Show = function() end,
   Hide = function() tooltipHidden = true end,
@@ -141,6 +145,12 @@ assert(ui.outputItemButton and type(ui.outputItemButton.scripts.OnEnter) == "fun
   "crafted item icon must offer a native item tooltip")
 ui.outputItemButton.scripts.OnEnter(ui.outputItemButton)
 same(tooltipLink, "item:900", "crafted item tooltip uses saved output item ID")
+same(tooltipOwner, ui.outputItemButton, "crafted item tooltip is owned by the hovered icon")
+same(tooltipAnchor[1], "TOPLEFT", "item tooltip starts beside the icon")
+same(tooltipAnchor[2], ui.outputItemButton, "item tooltip is anchored to the hovered icon")
+same(tooltipAnchor[3], "TOPRIGHT", "item tooltip sits to the icon's right")
+same(tooltipAnchor[4], 6, "item tooltip uses a small horizontal gap")
+same(tooltipAnchor[5], 0, "item tooltip aligns vertically with the icon")
 same(comparedTooltip, GameTooltip, "native equipped-item comparison is requested when available")
 ui.outputItemButton.scripts.OnLeave(ui.outputItemButton)
 assert(tooltipHidden, "crafted item tooltip hides when the pointer leaves")
@@ -149,6 +159,9 @@ assert(type(ui.materialCards[1].scripts.OnEnter) == "function",
   "material card must offer a native item tooltip")
 ui.materialCards[1].scripts.OnEnter(ui.materialCards[1])
 same(tooltipLink, "item:100", "material tooltip uses saved reagent item ID")
+same(tooltipAnchor[2], ui.materialCards[1], "material tooltip is anchored to its card")
+same(tooltipAnchor[3], "TOPLEFT", "material tooltip starts beside the reagent icon")
+same(tooltipAnchor[4], 38, "material tooltip uses the icon edge, not the full card width")
 local recipeTreeTooltip = false
 for _, row in ipairs(ui.rows or {}) do
   if type(row.scripts.OnEnter) == "function" then

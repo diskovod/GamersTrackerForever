@@ -120,7 +120,7 @@ local function setIcon(texture, value)
   end
 end
 
-local function attachItemTooltip(self, frame, itemID, itemLink)
+local function attachItemTooltip(self, frame, itemID, itemLink, iconInset)
   itemID = tonumber(itemID)
   if not itemID or itemID <= 0 then return end
   frame:EnableMouse(true)
@@ -130,7 +130,17 @@ local function attachItemTooltip(self, frame, itemID, itemLink)
       or type(tooltip.SetHyperlink) ~= "function" then return end
     local link = type(itemLink) == "string" and itemLink ~= "" and itemLink
       or "item:" .. tostring(itemID)
-    tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    if type(tooltip.SetPoint) == "function" then
+      tooltip:SetOwner(owner, "ANCHOR_NONE")
+      if type(tooltip.ClearAllPoints) == "function" then tooltip:ClearAllPoints() end
+      if iconInset then
+        tooltip:SetPoint("TOPLEFT", owner, "TOPLEFT", iconInset, 0)
+      else
+        tooltip:SetPoint("TOPLEFT", owner, "TOPRIGHT", 6, 0)
+      end
+    else
+      tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    end
     local ok = pcall(tooltip.SetHyperlink, tooltip, link)
     if ok then
       tooltip:Show()
@@ -499,7 +509,7 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
     local card = CreateFrame("Frame", nil, self.detailContent)
     card:SetPoint("TOPLEFT", self.detailContent, 8 + column * (cardWidth + 8), y - rowIndex * 55)
     card:SetSize(cardWidth, 50)
-    attachItemTooltip(self, card, material.itemID, material.link)
+    attachItemTooltip(self, card, material.itemID, material.link, 38)
     local materialIcon = card:CreateTexture(nil, "ARTWORK")
     materialIcon:SetSize(32, 32); materialIcon:SetPoint("TOPLEFT", card, 2, -5)
     setIcon(materialIcon, material.icon)
