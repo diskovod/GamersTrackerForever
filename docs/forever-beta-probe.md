@@ -23,16 +23,21 @@ claim based on the version number.
    `unknown` if this client exposes no detectable frame).
 4. Open one profession normally, wait for its list to finish loading, and run
    `/gtf probe` again. The probe only observes the already-open UI; it does not
-   open or close frames. When the frame is detectable as open it performs only
-   bounded aggregate checks of the current line and recipe-ID list return
-   shapes/counts. It never calls recipe-detail, item-link, or reagent methods,
-   and it never prints recipe/item names or IDs.
+   open or close frames. When the frame is detectable as open it performs
+   bounded aggregate checks of the current line and recipe-ID list shapes and
+   counts, then samples no more than three numeric IDs for available recipe
+   info/schematic calls. It reports aggregate call/error/table counts, learned
+   true/false counts, numeric output/quantity-range availability, and reagent
+   slot quantity/exact-item/ambiguous counts (at most 100 slots per sample).
+   It discards recipe IDs, names, links, and raw reagent values and never
+   writes data.
 5. Repeat the open-window run for each profession type available to the
    character. Save the complete chat output for adapter work, including the
-   `functions x/y`, `window`, `line`, and `recipe lists ok/count` lines.
-   Those fields tell us which adapter calls are safe and whether a dedicated
-   recipe adapter needs a line ID argument, a list-return API, or another
-   client-specific surface.
+   `functions x/y`, `window`, line/list summaries, and modern recipe detail
+   sample counts. These summaries are not enough to enable persistence: also
+   establish that the learned flag distinguishes known and unknown recipes,
+   the list covers all learned recipes rather than the active filter, and the
+   detail fields provide complete output and reagent data.
 6. Run the command once with the bank closed. If bank access is reported as
    unknown, open the bank normally and run it again. Bank slot contents are
    deliberately never read by the probe.
@@ -49,11 +54,9 @@ claim based on the version number.
 Send the `/gtf probe` output from the closed-window run and from each open
 profession run. The useful evidence is the client/build/interface line, the
 `modern trade C_TradeSkillUI` availability line, the detected window state,
-the line return-shape booleans, and the aggregate recipe-list counts. Do not
-send screenshots or logs containing account paths, item names, or recipe
-links. A dedicated adapter can be designed once we have the list return shape
-and the exact availability of detail/link methods; the probe intentionally does
-not invoke those methods because their returns can contain names and materials.
+line/list counts, and detail sample aggregates. Do not send screenshots or logs
+containing account paths, item names, or recipe links. These probe results
+describe shapes only and do not authorize enabling recipe persistence.
 
 The local beta install is identified by `.flavor.info` as
 `wow_classic_beta`; that file does not prove the in-game API contract. The

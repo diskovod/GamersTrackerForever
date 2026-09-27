@@ -30,6 +30,19 @@ local function safeString(value)
   return value == nil and "" or tostring(value)
 end
 
+-- Forever's beta UnitFullName returns the first and last parts of the
+-- character name. GetRealmName is the separate realm authority.
+function ForeverBeta.NormalizeUnitFullName(env, name, secondPart)
+  name, secondPart = safeString(name), safeString(secondPart)
+  local actualRealm = ""
+  if hasFunction(env, "GetRealmName") then
+    local ok, realm = pcall(env.GetRealmName)
+    if ok then actualRealm = safeString(realm) end
+  end
+  local displayName = secondPart ~= "" and (name .. " " .. secondPart) or name
+  return displayName:gsub("^%s+", ""), actualRealm
+end
+
 function ForeverBeta:ReadClientInfo()
   local version, build, date, interface = "", "", "", 0
   if hasFunction(self.env, "GetBuildInfo") then
@@ -60,6 +73,12 @@ end
 
 function ForeverBeta:GetCurrentIdentity()
   local identity = Classic.GetCurrentIdentity(self)
+  if hasFunction(self.env, "UnitFullName") then
+    local ok, name, secondPart = pcall(self.env.UnitFullName, "player")
+    if ok then
+      identity.displayName, identity.realm = ForeverBeta.NormalizeUnitFullName(self.env, name, secondPart)
+    end
+  end
   identity.ruleset = "forever_beta"
   return identity
 end

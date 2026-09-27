@@ -1,7 +1,8 @@
 -- Read-only runtime compatibility probe for the World of Warcraft Forever
 -- beta.  This module intentionally does not select a Forever adapter or make
 -- any claim that a beta build is supported.  It is inert until /gtf probe is
--- used and contains no file, network, protected-action, or item-name access.
+-- used and contains no file, network, or protected-action access. Recipe
+-- detail APIs are summarized without retaining their names or identifiers.
 
 GamersTrackerForever = GamersTrackerForever or {}
 
@@ -138,6 +139,12 @@ function Probe:ReadCharacter()
   if ok then
     result.displayName = stringValue(values[1])
     result.realm = stringValue(values[2])
+  end
+  local betaApi = GTF.ApiCompat and GTF.ApiCompat.ForeverBeta
+  local isForever = self.api and type(self.api.GetProduct) == "function"
+    and self.api:GetProduct() == GTF.PRODUCT_FOREVER_BETA
+  if ok and isForever and betaApi and type(betaApi.NormalizeUnitFullName) == "function" then
+    result.displayName, result.realm = betaApi.NormalizeUnitFullName(env, values[1], values[2])
   end
   if not present(result.realm) then
     local realmOK, realmValues = call(env, "GetRealmName")
@@ -342,6 +349,15 @@ function Probe:ReadModernTradeSkills()
       getFilteredRecipeIDs = { attempted = false, ok = false, returns = 0, firstType = "nil", firstIsTable = false, firstCount = 0 },
       getAllRecipeIDs = { attempted = false, ok = false, returns = 0, firstType = "nil", firstIsTable = false, firstCount = 0 },
     },
+    recipeDetails = {
+      attempted = false, candidateCount = 0, sampledRecipeCount = 0, sampleLimit = 3,
+      info = { calls = 0, errors = 0, tableResults = 0, learnedKnown = 0, learnedTrue = 0, learnedFalse = 0 },
+      schematic = {
+        calls = 0, errors = 0, tableResults = 0, reagentSlotsKnown = 0, reagentSlotsAvailable = 0,
+        outputItemKnown = 0, quantityRangeKnown = 0, slotsInspected = 0,
+        slotQuantityKnown = 0, exactlyOneItemReagent = 0, ambiguousOrMissingReagent = 0,
+      },
+    },
   }
 
   -- Function availability is useful with the window closed.  All calls that
@@ -351,6 +367,7 @@ function Probe:ReadModernTradeSkills()
   end
 
   result.attempted = true
+  local recipeIDCandidates, allRecipeIDCandidates = nil, nil
   local function inspect(name, target)
     if not functions[name] then return end
     result.calls = result.calls + 1
@@ -360,6 +377,8 @@ function Probe:ReadModernTradeSkills()
     if ok then
       local shape = returnShape(ok, values)
       for key, value in pairs(shape) do target[key] = value end
+      if name == "GetFilteredRecipeIDs" and type(values[1]) == "table" then recipeIDCandidates = values[1] end
+      if name == "GetAllRecipeIDs" and type(values[1]) == "table" then allRecipeIDCandidates = values[1] end
     else
       result.errors = result.errors + 1
     end
@@ -369,6 +388,99 @@ function Probe:ReadModernTradeSkills()
   inspect("GetRecipesForSkillLine", result.recipeLists.getRecipesForSkillLine)
   inspect("GetFilteredRecipeIDs", result.recipeLists.getFilteredRecipeIDs)
   inspect("GetAllRecipeIDs", result.recipeLists.getAllRecipeIDs)
+
+  -- Inspect at most three IDs returned by the already-probed list APIs.
+  -- Only aggregate result shapes are retained; recipe IDs, names, and raw
+  -- reagent data never enter the report. This is diagnostic evidence only.
+  local details = result.recipeDetails
+  local ids = type(recipeIDCandidates) == "table" and next(recipeIDCandidates) ~= nil
+    and recipeIDCandidates or allRecipeIDCandidates
+  if type(ids) == "table" then
+    local candidateCount = 0
+    for _ in pairs(ids) do
+      candidateCount = candidateCount + 1
+      if candidateCount >= 200 then break end
+    end
+    details.candidateCount = candidateCount
+    local sampleLimit = 3
+    local idsVisited = 0
+    for key, value in pairs(ids) do
+      idsVisited = idsVisited + 1
+      if idsVisited > 200 then break end
+      if details.sampledRecipeCount >= sampleLimit then break end
+      local recipeID = type(value) == "number" and value or (value == true and type(key) == "number" and key or nil)
+      if type(recipeID) == "number" then
+        details.sampledRecipeCount = details.sampledRecipeCount + 1
+        if functions.GetRecipeInfo then
+          local target = details.info
+          target.calls = target.calls + 1
+          details.attempted = true
+          local infoOK, infoValues = invoke(owner.GetRecipeInfo, recipeID)
+          if not infoOK then
+            target.errors = target.errors + 1
+          elseif type(infoValues[1]) == "table" then
+            target.tableResults = target.tableResults + 1
+            local learned = infoValues[1].learned
+            if type(learned) == "boolean" then
+              target.learnedKnown = target.learnedKnown + 1
+              if learned then target.learnedTrue = target.learnedTrue + 1
+              else target.learnedFalse = target.learnedFalse + 1 end
+            end
+          end
+        end
+        if functions.GetRecipeSchematic then
+          local target = details.schematic
+          target.calls = target.calls + 1
+          details.attempted = true
+          local schematicOK, schematicValues = invoke(owner.GetRecipeSchematic, recipeID, false)
+          if not schematicOK then
+            target.errors = target.errors + 1
+          elseif type(schematicValues[1]) == "table" then
+            target.tableResults = target.tableResults + 1
+            local schematic = schematicValues[1]
+            if type(schematic.outputItemID) == "number" then target.outputItemKnown = target.outputItemKnown + 1 end
+            if type(schematic.quantityMin) == "number" and type(schematic.quantityMax) == "number" then
+              target.quantityRangeKnown = target.quantityRangeKnown + 1
+            end
+            local slots = schematic.reagentSlotSchematics
+            if type(slots) == "table" then
+              target.reagentSlotsKnown = target.reagentSlotsKnown + 1
+              local slotCount = 0
+              for _, slot in pairs(slots) do
+                slotCount = slotCount + 1
+                if slotCount > 100 then break end
+                target.slotsInspected = target.slotsInspected + 1
+                if type(slot) == "table" then
+                  if type(slot.quantityRequired) == "number" then
+                    target.slotQuantityKnown = target.slotQuantityKnown + 1
+                  end
+                  local reagents = slot.reagents
+                  local reagentCount, numericItemCount = 0, 0
+                  if type(reagents) == "table" then
+                    for _, reagent in pairs(reagents) do
+                      reagentCount = reagentCount + 1
+                      if reagentCount > 100 then break end
+                      if type(reagent) == "table" and type(reagent.itemID) == "number" then
+                        numericItemCount = numericItemCount + 1
+                      end
+                    end
+                  end
+                  if reagentCount == 1 and numericItemCount == 1 then
+                    target.exactlyOneItemReagent = target.exactlyOneItemReagent + 1
+                  else
+                    target.ambiguousOrMissingReagent = target.ambiguousOrMissingReagent + 1
+                  end
+                else
+                  target.ambiguousOrMissingReagent = target.ambiguousOrMissingReagent + 1
+                end
+              end
+              if slotCount > 0 then target.reagentSlotsAvailable = target.reagentSlotsAvailable + 1 end
+            end
+          end
+        end
+      end
+    end
+  end
   return result
 end
 
@@ -545,6 +657,22 @@ function Probe:FormatLines(result)
     "modern trade line " .. yesNo(modern.lineInfo and modern.lineInfo.ok)
       .. ", recipe lists ok/count GetRecipesForSkillLine " .. listShape("getRecipesForSkillLine")
       .. ", filtered " .. listShape("getFilteredRecipeIDs") .. ", all " .. listShape("getAllRecipeIDs"),
+    "recipe detail sampled " .. tostring(modern.recipeDetails and modern.recipeDetails.sampledRecipeCount or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.sampleLimit or 3)
+      .. ", info calls/errors/tables " .. tostring(modern.recipeDetails and modern.recipeDetails.info.calls or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.info.errors or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.info.tableResults or 0)
+      .. ", learned known/true/false " .. tostring(modern.recipeDetails and modern.recipeDetails.info.learnedKnown or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.info.learnedTrue or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.info.learnedFalse or 0)
+      .. ", schematic calls/errors/tables " .. tostring(modern.recipeDetails and modern.recipeDetails.schematic.calls or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.schematic.errors or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.schematic.tableResults or 0),
+    "recipe output/range known " .. tostring(modern.recipeDetails and modern.recipeDetails.schematic.outputItemKnown or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.schematic.quantityRangeKnown or 0)
+      .. ", reagent slots quantity/exact/ambiguous " .. tostring(modern.recipeDetails and modern.recipeDetails.schematic.slotQuantityKnown or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.schematic.exactlyOneItemReagent or 0)
+      .. "/" .. tostring(modern.recipeDetails and modern.recipeDetails.schematic.ambiguousOrMissingReagent or 0),
     "bags " .. (bags.available and bags.source or "unavailable") .. ": " .. tostring(bags.slotsReadable) .. "/" .. tostring(bags.slotsReported)
       .. " readable slots, " .. tostring(bags.itemSlots) .. " occupied, " .. tostring(bags.itemCount) .. " total items",
     "bank APIs C_Container " .. tostring(countTrue(bank.cContainerFunctions)) .. "/2, legacy " .. tostring(countTrue(bank.legacyFunctions))

@@ -38,7 +38,9 @@ read-only C_Container aggregate probing, bank access detection without a bank
 scan, product-partition inspection, and output redaction of item names.
 It also verifies that a `1.60.x` beta build reusing project ID `2` is routed
 to `unsupported:2`, selects no Classic scanner, and leaves the repository
-read-only.
+read-only. The harness checks Forever's first/last name interpretation while
+preserving GUID identity, and that open-window modern detail sampling is capped
+at three recipes and reports only aggregate learned/output/reagent shape facts.
 
 ## Task 2 repository harness
 

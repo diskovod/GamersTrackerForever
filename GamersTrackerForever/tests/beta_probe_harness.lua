@@ -1,6 +1,6 @@
 -- Read-only probe fixture.  It verifies the probe can inspect both legacy and
 -- C_Container-shaped APIs without opening the bank or retaining item names.
-local calls = { bank = 0, item = 0, modernLine = 0, modernLists = 0, legacyRecipes = 0 }
+local calls = { bank = 0, item = 0, modernLine = 0, modernLists = 0, detailInfo = 0, detailSchematic = 0, legacyRecipes = 0 }
 
 function GetBuildInfo() return "1.60.1", "69913", "fixture", 16001 end
 WOW_PROJECT_ID = 1
@@ -41,11 +41,20 @@ C_TradeSkillUI = {
   end,
   GetFilteredRecipeIDs = function()
     calls.modernLists = calls.modernLists + 1
-    return { 9001 }
+    return { [9001] = true, [9002] = true, [9003] = true, [9004] = true }
   end,
-  -- Availability is reported, but the probe must not invoke detail methods:
-  -- their return values could contain recipe/item names and reagent data.
-  GetRecipeInfo = function() error("detail API must not be called by probe") end,
+  GetRecipeInfo = function(recipeID)
+    calls.detailInfo = calls.detailInfo + 1
+    return { recipeID = recipeID, name = "Secret Recipe", learned = recipeID % 2 == 1, craftedItemID = 777 }
+  end,
+  GetRecipeSchematic = function(recipeID, isRecraft)
+    assert(isRecraft == false, "probe must use the ordinary recipe schematic signature")
+    calls.detailSchematic = calls.detailSchematic + 1
+    return {
+      recipeID = recipeID, outputItemID = 777, quantityMin = 1, quantityMax = 2,
+      reagentSlotSchematics = { { quantityRequired = 2, reagents = { { reagent = "Secret Reagent", itemID = 888 } } } },
+    }
+  end,
 }
 NUM_BAG_SLOTS = 1
 NUM_BANKBAGSLOTS = 7
@@ -75,6 +84,24 @@ assert(api:GetCurrentContext().level == 60)
 assert(api:GetCapabilities()[GamersTrackerForever.CAPABILITY.BAG_INVENTORY_SCAN])
 assert(api:GetCapabilities()[GamersTrackerForever.CAPABILITY.PROFESSION_ENUMERATION])
 assert(not api:GetCapabilities()[GamersTrackerForever.CAPABILITY.LEARNED_RECIPE_SCAN])
+local originalFullName = UnitFullName
+UnitFullName = function() return "Disko", "Lebowski" end
+local correctedIdentity = api:GetCurrentIdentity()
+assert(correctedIdentity.displayName == "Disko Lebowski" and correctedIdentity.realm == "Forever Realm",
+  "Forever's two-part name must stay separate from the real realm")
+assert(correctedIdentity.guid == "Player-99-0001", "GUID identity key source must remain intact")
+assert(api:GetCharacterKey(correctedIdentity) == "Player-99-0001", "display normalization must not change the GUID key")
+local originalRealmName = GetRealmName
+GetRealmName = function() return "Lebowski" end
+local matchingRealmIdentity = api:GetCurrentIdentity()
+assert(matchingRealmIdentity.displayName == "Disko Lebowski" and matchingRealmIdentity.realm == "Lebowski",
+  "Forever's second UnitFullName value remains part of the name even if it matches realm text")
+GetRealmName = function() return nil end
+local missingRealmIdentity = api:GetCurrentIdentity()
+assert(missingRealmIdentity.displayName == "Disko Lebowski" and missingRealmIdentity.realm == "",
+  "without GetRealmName, preserve the full name and leave realm unknown")
+GetRealmName = originalRealmName
+UnitFullName = originalFullName
 local professionInfo = GetProfessionInfo
 GetProfessionInfo = function(index)
   if index == 4 then return "Alchemy", 1, nil, nil end
@@ -85,6 +112,14 @@ assert(incompleteRanks == nil, "missing beta ranks must not become a zero snapsh
 GetProfessionInfo = professionInfo
 local probe = GamersTrackerForever.BetaProbe:Create(_G, api)
 assert(calls.bank == 0 and calls.item == 0, "probe must be inert until run")
+UnitFullName = function() return "Disko", "Lebowski" end
+local nameProbe = probe:Run()
+local formattedNameProbe = table.concat(probe:FormatLines(nameProbe), "\n")
+assert(formattedNameProbe:match("character Disko Lebowski @ Forever Realm"),
+  "probe output must show the full character name and actual realm")
+UnitFullName = originalFullName
+-- Isolate the regular closed-window bag assertions from the identity-only run.
+calls.bank, calls.item = 0, 0
 local result = probe:Run()
 assert(result.client.interface == 16001 and result.client.flavor == "test")
 assert(result.character.guid == "Player-99-0001" and result.character.level == 60)
@@ -102,8 +137,8 @@ local lines = probe:FormatLines(result)
 local output = table.concat(lines, "\n")
 assert(not output:match("Copper") and not output:match("Item Name") and not output:match("secret"))
 
--- Opening the already-existing profession frame enables only the bounded
--- aggregate probes.  No recipe-detail function is called.
+-- Opening the already-existing profession frame enables bounded aggregate
+-- detail sampling, but the report retains no recipe/item identifiers.
 TradeSkillFrame.shown = true
 local openResult = probe:Run()
 assert(openResult.tradeSkills.modern.window == "open")
@@ -111,10 +146,39 @@ assert(openResult.tradeSkills.modern.attempted == true)
 assert(openResult.tradeSkills.modern.lineInfo.ok == true)
 assert(openResult.tradeSkills.modern.lineInfo.firstIsTable == true)
 assert(openResult.tradeSkills.modern.recipeLists.getRecipesForSkillLine.firstCount == 2)
-assert(openResult.tradeSkills.modern.recipeLists.getFilteredRecipeIDs.firstCount == 1)
+assert(openResult.tradeSkills.modern.recipeLists.getFilteredRecipeIDs.firstCount == 4)
+assert(openResult.tradeSkills.modern.recipeDetails.sampledRecipeCount == 3)
+assert(openResult.tradeSkills.modern.recipeDetails.info.calls == 3)
+assert(openResult.tradeSkills.modern.recipeDetails.info.learnedKnown == 3)
+assert(openResult.tradeSkills.modern.recipeDetails.info.learnedTrue > 0)
+assert(openResult.tradeSkills.modern.recipeDetails.info.learnedFalse > 0)
+assert(openResult.tradeSkills.modern.recipeDetails.info.learnedTrue
+  + openResult.tradeSkills.modern.recipeDetails.info.learnedFalse == 3)
+assert(openResult.tradeSkills.modern.recipeDetails.schematic.reagentSlotsAvailable == 3)
+assert(openResult.tradeSkills.modern.recipeDetails.schematic.outputItemKnown == 3)
+assert(openResult.tradeSkills.modern.recipeDetails.schematic.quantityRangeKnown == 3)
+assert(openResult.tradeSkills.modern.recipeDetails.schematic.slotQuantityKnown == 3)
+assert(openResult.tradeSkills.modern.recipeDetails.schematic.exactlyOneItemReagent == 3)
 assert(calls.modernLine == 1 and calls.modernLists == 2)
+assert(calls.detailInfo == 3 and calls.detailSchematic == 3, "detail calls must stay bounded by the sample")
 local openOutput = table.concat(probe:FormatLines(openResult), "\n")
 assert(not openOutput:match("9001") and not openOutput:match("skillLineID"))
+assert(not openOutput:match("Secret Recipe") and not openOutput:match("Secret Reagent")
+  and not openOutput:match("777") and not openOutput:match("888"), "probe output must not leak detail names or IDs")
+assert(openResult.tradeSkills.modern.recipeDetails.recipeID == nil, "detail probe must discard sampled recipe IDs")
+local recipeInfo, recipeSchematic = C_TradeSkillUI.GetRecipeInfo, C_TradeSkillUI.GetRecipeSchematic
+C_TradeSkillUI.GetRecipeInfo = function() error("detail unavailable") end
+C_TradeSkillUI.GetRecipeSchematic = function() error("schematic unavailable") end
+local errorResult = probe:Run()
+assert(errorResult.tradeSkills.modern.recipeDetails.info.calls == 3
+  and errorResult.tradeSkills.modern.recipeDetails.info.errors == 3
+  and errorResult.tradeSkills.modern.recipeDetails.info.tableResults == 0)
+assert(errorResult.tradeSkills.modern.recipeDetails.schematic.calls == 3
+  and errorResult.tradeSkills.modern.recipeDetails.schematic.errors == 3
+  and errorResult.tradeSkills.modern.recipeDetails.schematic.tableResults == 0)
+local errorOutput = table.concat(probe:FormatLines(errorResult), "\n")
+assert(errorOutput:match("info calls/errors/tables 3/3/0"), "probe output must distinguish detail API errors")
+C_TradeSkillUI.GetRecipeInfo, C_TradeSkillUI.GetRecipeSchematic = recipeInfo, recipeSchematic
 
 -- Bootstrap enables rank-only profession persistence, while recipe services
 -- remain disabled. Trade-skill events must never invoke legacy recipe APIs.
