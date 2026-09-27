@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.10 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.11 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.10.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.11.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -24,6 +24,8 @@
   professions and ranks, expand a profession to browse captured recipes, then
   select a recipe to see material icons and quantities on the right. A separate
   panel below shows each tracked character's last-known bag/bank holdings.
+  Hover a recipe row, crafted item icon, or material card for the native item
+  tooltip. An equipped-item comparison appears when the client provides it.
   Use `Track up to` to choose 1–10 tracked characters (default 3); a full limit
   does not untrack anyone automatically.
 

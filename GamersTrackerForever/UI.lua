@@ -120,6 +120,32 @@ local function setIcon(texture, value)
   end
 end
 
+local function attachItemTooltip(self, frame, itemID, itemLink)
+  itemID = tonumber(itemID)
+  if not itemID or itemID <= 0 then return end
+  frame:EnableMouse(true)
+  frame:SetScript("OnEnter", function(owner)
+    local tooltip = self.env and self.env.GameTooltip or GameTooltip
+    if not tooltip or type(tooltip.SetOwner) ~= "function"
+      or type(tooltip.SetHyperlink) ~= "function" then return end
+    local link = type(itemLink) == "string" and itemLink ~= "" and itemLink
+      or "item:" .. tostring(itemID)
+    tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    local ok = pcall(tooltip.SetHyperlink, tooltip, link)
+    if ok then
+      tooltip:Show()
+      local compare = self.env and self.env.GameTooltip_ShowCompareItem or GameTooltip_ShowCompareItem
+      if type(compare) == "function" then pcall(compare, tooltip) end
+    else
+      tooltip:Hide()
+    end
+  end)
+  frame:SetScript("OnLeave", function()
+    local tooltip = self.env and self.env.GameTooltip or GameTooltip
+    if tooltip and type(tooltip.Hide) == "function" then tooltip:Hide() end
+  end)
+end
+
 local function hideRows(rows)
   for _, row in ipairs(rows or {}) do if row.Hide then row:Hide() end end
 end
@@ -331,6 +357,8 @@ function UI:RefreshCharacters(productKey, product)
       line:SetText(caption)
       row:SetScript("OnClick", onClick)
       self.rows[#self.rows + 1] = row
+      y = y - height - 2; contentHeight = contentHeight + height + 2
+      return row
     else
       local line = label(self.characterContent, font or "GameFontDisableSmall", "TOPLEFT", self.characterContent,
         5 + indent, y, width - 4, height)
@@ -365,8 +393,11 @@ function UI:RefreshCharacters(productKey, product)
             else
               for _, recipe in ipairs(profession.recipes) do
                 local selectedRecipe = tostring(self.selectedRecipeKey or "") == tostring(recipe.key)
-                addTreeRow((selectedRecipe and "• " or "  ") .. recipe.name, 27, 24,
+                local recipeRow = addTreeRow((selectedRecipe and "• " or "  ") .. recipe.name, 27, 24,
                   function() self:SelectRecipe(model.key, profession.key, recipe.key) end)
+                local definition = product.recipes and product.recipes[recipe.key]
+                attachItemTooltip(self, recipeRow, definition and definition.outputItemID,
+                  definition and definition.outputItemLink)
               end
             end
           end
@@ -409,10 +440,14 @@ end
 
 function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, width, settings)
   local recipe = product.recipes and product.recipes[recipeRow.key]
-  local icon = self.detailContent:CreateTexture(nil, "ARTWORK")
-  icon:SetSize(38, 38); icon:SetPoint("TOPLEFT", self.detailContent, 8, y)
+  local outputButton = CreateFrame("Button", nil, self.detailContent)
+  outputButton:SetSize(38, 38); outputButton:SetPoint("TOPLEFT", self.detailContent, 8, y)
+  local icon = outputButton:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(38, 38); icon:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
   setIcon(icon, recipe and recipe.icon or recipeRow.icon)
-  self.detailRows[#self.detailRows + 1] = icon
+  attachItemTooltip(self, outputButton, recipe and recipe.outputItemID, recipe and recipe.outputItemLink)
+  self.outputItemButton = outputButton
+  self.detailRows[#self.detailRows + 1] = outputButton
   local title = label(self.detailContent, "GameFontHighlightLarge", "TOPLEFT", self.detailContent, 52, y,
     width - 58, 22)
   title:SetText(recipeRow.name); self.detailRows[#self.detailRows + 1] = title
@@ -464,6 +499,7 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
     local card = CreateFrame("Frame", nil, self.detailContent)
     card:SetPoint("TOPLEFT", self.detailContent, 8 + column * (cardWidth + 8), y - rowIndex * 55)
     card:SetSize(cardWidth, 50)
+    attachItemTooltip(self, card, material.itemID, material.link)
     local materialIcon = card:CreateTexture(nil, "ARTWORK")
     materialIcon:SetSize(32, 32); materialIcon:SetPoint("TOPLEFT", card, 2, -5)
     setIcon(materialIcon, material.icon)
@@ -524,7 +560,7 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
 end
 
 function UI:RefreshDetail(productKey, product, characterKey)
-  hideRows(self.detailRows); self.detailRows = {}; self.materialCards = {}; self.sourceRows = {}
+  hideRows(self.detailRows); self.detailRows = {}; self.materialCards = {}; self.sourceRows = {}; self.outputItemButton = nil
   local settings = self.repository and self.repository.db and self.repository.db.settings or {}
   local model = GTF.ViewModels.BuildCharacterDetail(product, characterKey, {
     now = now(self.env), settings = settings, includeInventoryRows = false,

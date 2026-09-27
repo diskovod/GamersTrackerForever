@@ -108,6 +108,14 @@ _G.UIDropDownMenu_SetText = function(frame, value)
   assert(type(frame) == "table", "UIDropDownMenu_SetText must receive frame first")
   dropdownText = value; frame.dropdownText = value
 end
+local tooltipLink, tooltipHidden, comparedTooltip
+_G.GameTooltip = {
+  SetOwner = function() end,
+  SetHyperlink = function(_, link) tooltipLink = link end,
+  Show = function() end,
+  Hide = function() tooltipHidden = true end,
+}
+_G.GameTooltip_ShowCompareItem = function(tooltip) comparedTooltip = tooltip end
 local ui = GamersTrackerForever.UI:Create({ env = {
   time = function() return 2000 end,
   GetItemInfo = function() return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555 end,
@@ -129,6 +137,27 @@ assert(ui.expandedProfessions["ana|alchemy"] and ui.selectedProfessionKey == "al
 ui:SelectRecipe("ana", "alchemy", "recipe:1")
 assert(ui.selectedRecipeKey == "recipe:1" and #ui.materialCards == 1,
   "recipe selection renders a material card")
+assert(ui.outputItemButton and type(ui.outputItemButton.scripts.OnEnter) == "function",
+  "crafted item icon must offer a native item tooltip")
+ui.outputItemButton.scripts.OnEnter(ui.outputItemButton)
+same(tooltipLink, "item:900", "crafted item tooltip uses saved output item ID")
+same(comparedTooltip, GameTooltip, "native equipped-item comparison is requested when available")
+ui.outputItemButton.scripts.OnLeave(ui.outputItemButton)
+assert(tooltipHidden, "crafted item tooltip hides when the pointer leaves")
+tooltipLink = nil
+assert(type(ui.materialCards[1].scripts.OnEnter) == "function",
+  "material card must offer a native item tooltip")
+ui.materialCards[1].scripts.OnEnter(ui.materialCards[1])
+same(tooltipLink, "item:100", "material tooltip uses saved reagent item ID")
+local recipeTreeTooltip = false
+for _, row in ipairs(ui.rows or {}) do
+  if type(row.scripts.OnEnter) == "function" then
+    tooltipLink = nil
+    row.scripts.OnEnter(row)
+    if tooltipLink == "item:900" then recipeTreeTooltip = true; break end
+  end
+end
+assert(recipeTreeTooltip, "recipe rows also show the crafted item tooltip")
 same(ui.materialCards[1].textures[1].texture, 555, "material card uses the item texture, not item quality")
 same(#ui.sourceRows, 3, "separate holdings panel includes every tracked character")
 ui:SelectCharacter("ana")
