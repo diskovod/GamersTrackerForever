@@ -73,8 +73,10 @@ local function mockFrame()
   function f:SetSize(w, h) self.w, self.h = w, h end
   function f:SetHeight(h) self.h = h end; function f:SetWidth(w) self.w = w end
   function f:GetWidth() return self.w or 1 end; function f:GetHeight() return self.h or 1 end
-  function f:SetPoint(...) self.point = { ... } end; function f:ClearAllPoints() end
-  function f:SetFrameStrata() end; function f:SetFrameLevel() end; function f:SetClampedToScreen() end
+  function f:GetTop() return self.top end
+  function f:SetPoint(...) self.point = { ... } end; function f:ClearAllPoints() self.point = nil end
+  function f:SetOwner(owner, anchor) self.owner, self.ownerAnchor = owner, anchor end
+  function f:SetFrameStrata() end; function f:SetFrameLevel() end; function f:SetClampedToScreen(v) self.clampedToScreen = v end
   function f:SetMovable() end; function f:EnableMouse() end; function f:SetResizable() end; function f:SetResizeBounds() end; function f:SetMinResize() end
   function f:RegisterForDrag() end; function f:SetScript(name, fn) self.scripts[name] = fn end; function f:StartMoving() end; function f:StopMovingOrSizing() end
   function f:Show() self.shown = true end; function f:Hide() self.shown = false end; function f:IsShown() return self.shown end; function f:SetShown(v) self.shown = v end
@@ -87,7 +89,9 @@ local function mockFrame()
   function f:SetAutoFocus() end; function f:SetTextInsets() end; function f:SetHighlightTexture() end; function f:ClearFocus() end
   function f:SetText(v) self.text = v end; function f:GetText() return self.text or "" end
   function f:SetTexture(v) self.texture = v end
+  function f:SetAtlas(v) self.atlas = v end
   function f:SetTexCoord(...) self.texCoord = { ... } end
+  function f:AddMaskTexture(mask) self.maskTexture = mask end
   function f:CreateFontString()
     local fontString = mockFrame()
     self.fontStrings = self.fontStrings or {}
@@ -99,6 +103,12 @@ local function mockFrame()
     self.textures = self.textures or {}
     self.textures[#self.textures + 1] = texture
     return texture
+  end
+  function f:CreateMaskTexture()
+    local mask = mockFrame()
+    self.maskTextures = self.maskTextures or {}
+    self.maskTextures[#self.maskTextures + 1] = mask
+    return mask
   end
   function f:GetPoint() return "CENTER", nil, "CENTER", 0, 0 end
   return f
@@ -118,6 +128,9 @@ _G.UIDropDownMenu_SetText = function(frame, value)
   dropdownText = value; frame.dropdownText = value
 end
 local tooltipLink, tooltipHidden, comparedTooltip, tooltipOwner, tooltipAnchor
+_G.ShoppingTooltip1 = mockFrame()
+_G.ShoppingTooltip2 = mockFrame()
+_G.ShoppingTooltip1:Show()
 _G.GameTooltip = {
   SetOwner = function(_, owner, anchor) tooltipOwner = owner; tooltipAnchor = anchor end,
   ClearAllPoints = function() end,
@@ -128,7 +141,18 @@ _G.GameTooltip = {
   Show = function() end,
   Hide = function() tooltipHidden = true end,
 }
-_G.GameTooltip_ShowCompareItem = function(tooltip) comparedTooltip = tooltip end
+_G.GameTooltip.shoppingTooltips = { _G.ShoppingTooltip1, _G.ShoppingTooltip2 }
+_G.GameTooltip_ShowCompareItem = function(tooltip)
+  comparedTooltip = tooltip
+  -- Reproduce WoW's left-flip heuristic for the output icon despite free room rightward.
+  if tooltipOwner == _G.outputTooltipOwner then
+    _G.ShoppingTooltip1:SetPoint("TOPRIGHT", tooltip, "TOPLEFT", 0, -10)
+  else
+    _G.ShoppingTooltip1:SetPoint("TOPLEFT", tooltip, "TOPRIGHT", 0, -10)
+  end
+  _G.ShoppingTooltip1.content = "equipped item comparison"
+  _G.ShoppingTooltip1:Show()
+end
 -- Some clients include the profession itself as the first category ancestor.
 -- The UI should render it once as the profession header, not twice.
 product.recipes["recipe:1"].categoryPath = { "Alchemy", "Potions", "Healing" }
@@ -239,16 +263,17 @@ assert(treeContains("Test Potion"), "reopening a category restores its recipes")
 ui:SelectRecipe("ana", "alchemy", "recipe:1")
 assert(ui.selectedRecipeKey == "recipe:1" and #ui.materialCards == 1,
   "recipe selection renders a material card")
-assert(ui.outputQualityRing and ui.outputQualityRing.texture == "Interface\\Minimap\\MiniMap-TrackingBorder",
-  "known crafted-item quality adds a circular border")
-same(ui.outputQualityRing.point[1], "TOPLEFT",
-  "tracking-border art is aligned from the item icon's top-left, as in the native UI")
+assert(ui.outputQualityRing and ui.outputQualityRing.atlas == "Professions-Slot-Frame-Green",
+  "uncommon crafted item uses a profession-style green icon frame")
+assert(ui.outputItemIcon and ui.outputItemIcon.maskTexture
+  and ui.outputItemIcon.maskTexture.texture == "Interface\\CharacterFrame\\TempPortraitAlphaMask",
+  "crafted item texture is circularly masked like the native profession icon")
+same(ui.outputQualityRing.point[1], "CENTER",
+  "profession-style quality rim is centered around the icon")
 same(ui.outputQualityRing.point[2], ui.outputItemButton,
   "quality border is anchored to its own output item icon")
-same(ui.outputQualityRing.w, 68,
-  "quality border scales the native 52-to-32 art ratio for the 42-pixel item icon")
-assert(ui.outputQualityRing.vertexColor[2] > ui.outputQualityRing.vertexColor[1],
-  "uncommon crafted-item ring is green")
+same(ui.outputQualityRing.w, 56,
+  "profession-style quality rim surrounds the circular item image")
 assert(ui.outputItemTitle.textColor[2] > ui.outputItemTitle.textColor[1],
   "crafted-item name follows the item quality color")
 assert(ui.sourcePanel and ui.sourcePanel ~= ui.detailRows[1],
@@ -283,34 +308,51 @@ ui:Refresh()
 assert(not treeContains("Test Potion |cffff4040×|r"), "allowed armor is not crossed out")
 assert(ui.outputItemButton and type(ui.outputItemButton.scripts.OnEnter) == "function",
   "crafted item icon must offer a native item tooltip")
+_G.outputTooltipOwner = ui.outputItemButton
+ShoppingTooltip1:Hide()
 ui.outputItemButton.scripts.OnEnter(ui.outputItemButton)
 same(tooltipLink, "item:900", "crafted item tooltip uses saved output item ID")
 same(tooltipOwner, ui.outputItemButton, "crafted item tooltip is owned by the hovered icon")
-same(tooltipAnchor[1], "TOPLEFT", "item tooltip starts beside the icon")
-same(tooltipAnchor[2], ui.outputItemButton, "item tooltip is anchored to the hovered icon")
-same(tooltipAnchor[3], "TOPRIGHT", "item tooltip sits to the icon's right")
-same(tooltipAnchor[4], 6, "item tooltip uses a small horizontal gap")
-same(tooltipAnchor[5], 0, "item tooltip aligns vertically with the icon")
-same(comparedTooltip, GameTooltip, "native equipped-item comparison is requested when available")
+same(tooltipAnchor[1], "BOTTOMLEFT", "item tooltip aligns below its bottom-left corner")
+same(tooltipAnchor[2], ui.outputItemButton, "output tooltip anchors to the hovered icon")
+same(tooltipAnchor[3], "TOPRIGHT", "output tooltip opens above and right of the icon")
+same(tooltipAnchor[4], 0, "output tooltip touches the icon edge like the native tooltip")
+same(tooltipAnchor[5], 0, "output tooltip aligns its bottom with the icon top")
+assert(GameTooltip.clampedToScreen, "main item tooltip is clamped to the screen")
+same(comparedTooltip, GameTooltip, "native equipped comparison tooltip remains enabled")
+assert(ShoppingTooltip1.shown, "native item comparison tooltip remains visible")
+same(ShoppingTooltip1.point[1], "TOPLEFT", "comparison tooltip stays to the main tooltip's right")
+same(ShoppingTooltip1.point[2], GameTooltip, "comparison tooltip uses native tooltip placement")
+same(ShoppingTooltip1.point[3], "TOPRIGHT", "comparison tooltip begins at the main tooltip's right edge")
+same(ShoppingTooltip1.content, "equipped item comparison",
+  "reanchoring keeps the native comparison content intact")
 ui.outputItemButton.scripts.OnLeave(ui.outputItemButton)
 assert(tooltipHidden, "crafted item tooltip hides when the pointer leaves")
 tooltipLink = nil
-assert(type(ui.materialCards[1].scripts.OnEnter) == "function",
+assert(type(ui.materialCards[1].itemButton.scripts.OnEnter) == "function",
   "material card must offer a native item tooltip")
-ui.materialCards[1].scripts.OnEnter(ui.materialCards[1])
+ui.materialCards[1].itemButton.scripts.OnEnter(ui.materialCards[1].itemButton)
 same(tooltipLink, "item:100", "material tooltip uses saved reagent item ID")
-same(tooltipAnchor[2], ui.materialCards[1], "material tooltip is anchored to its card")
-same(tooltipAnchor[3], "TOPLEFT", "material tooltip starts beside the reagent icon")
-same(tooltipAnchor[4], 38, "material tooltip uses the icon edge, not the full card width")
-local recipeTreeTooltip = false
+same(tooltipAnchor[1], "BOTTOMLEFT", "material tooltip aligns below its bottom-left corner")
+same(tooltipAnchor[2], ui.materialCards[1].itemButton, "material tooltip anchors to the reagent icon")
+same(tooltipAnchor[3], "TOPRIGHT", "material tooltip opens above and right of the reagent icon")
+same(tooltipAnchor[4], 0, "material tooltip touches the reagent icon edge")
+same(tooltipAnchor[5], 0, "material tooltip aligns with the reagent icon top")
+local recipeTreeTooltip, recipeTooltipOwner = false, nil
+ShoppingTooltip1:Hide()
 for _, row in ipairs(ui.rows or {}) do
   if type(row.scripts.OnEnter) == "function" then
     tooltipLink = nil
     row.scripts.OnEnter(row)
-    if tooltipLink == "item:900" then recipeTreeTooltip = true; break end
+    if tooltipLink == "item:900" then recipeTreeTooltip = true; recipeTooltipOwner = row; break end
   end
 end
 assert(recipeTreeTooltip, "recipe rows also show the crafted item tooltip")
+same(tooltipAnchor[1], "BOTTOMLEFT", "recipe-row item tooltip opens above the row")
+same(tooltipAnchor[2], recipeTooltipOwner, "recipe-row tooltip anchors to the hovered row")
+same(tooltipAnchor[3], "TOPRIGHT", "recipe-row tooltip opens to the row's right")
+same(ShoppingTooltip1.point[1], "TOPLEFT", "recipe-row comparison keeps WoW's native side placement")
+same(ShoppingTooltip1.point[2], GameTooltip, "recipe-row comparison remains beside its main tooltip")
 same(ui.materialCards[1].textures[1].texture, 555, "material card uses the item texture, not item quality")
 same(#ui.sourceCards, 1, "only characters with positive known holdings get cards")
 same(#ui.sourceRows, 1, "zero and unknown holdings do not clutter the subpanel")
@@ -320,8 +362,9 @@ assert(ui.sourceRows[1].gtfItemButton and type(ui.sourceRows[1].gtfItemButton.sc
   "holding icon keeps the native item tooltip")
 ui.env.GetItemInfo = function() return nil end
 ui:Refresh()
-assert(not ui.outputQualityRing and not ui.outputItemTitle.textColor,
-  "uncached crafted-item quality leaves its title and icon border neutral")
+assert(ui.outputQualityRing and ui.outputQualityRing.atlas == "Professions-Slot-Frame"
+  and not ui.outputItemTitle.textColor,
+  "uncached crafted-item quality leaves a neutral profession-style icon frame")
 same(ui.materialCards[1].fontStrings[1].text, "4/10",
   "uncached reagent keeps its count without showing Unknown material")
 ui.env.GetItemInfo = function(itemID)

@@ -1,14 +1,14 @@
 # GamersTrackerForever — Addon Specification
 
-**Version:** 1.4 (search-only recipe browsing and header styling)
+**Version:** 1.5 (beta.20 item tooltips and optional local sync prototype)
 
-**Status:** Implemented in 0.3.0-beta.19; client acceptance remains partial
+**Status:** Implemented in 0.3.0-beta.20; client acceptance remains partial
 
 **Updated:** 2026-09-27
 
 **Platforms:** WoW Classic Era and World of Warcraft: Forever beta
 
-**Storage scope:** One local WoW installation/account-wide SavedVariables file; no server yet
+**Storage scope:** Account-wide SavedVariables in one WoW installation, with an optional loopback-only companion/server prototype
 
 ## 1. Product definition
 
@@ -73,6 +73,7 @@ The core must remain client-neutral. All version-sensitive calls belong behind a
 - Display required materials with bag, bank, per-character, pooled, and shortage totals.
 - Indicate stale, missing, and never-scanned data.
 - Store everything locally in account-wide SavedVariables.
+- Optionally export persisted character snapshots through a separate local Python companion to a token-protected, loopback-only SQLite server; this does not import data into the addon.
 - Provide a compact, expandable Blizzard-style UI.
 - Use a persistent two-pane native UI: a searchable, scrollable left tree and
   a larger right detail pane. The tree is Character > Profession > Category >
@@ -89,8 +90,8 @@ The core must remain client-neutral. All version-sensitive calls belong behind a
 
 - Quest or questline progress.
 - Automatic crafting, buying, selling, mailing, trading, or item movement.
-- Cloud or server synchronization.
-- Synchronization across computers or separate WoW account folders.
+- Production cloud synchronization and automatic in-game import of remote data.
+- Automatic synchronization across computers or separate WoW account folders.
 - Live Wowhead or other website requests.
 - A complete catalog of recipes no discovered character knows.
 - Recipe source/drop/vendor guidance.
@@ -320,9 +321,11 @@ Diagnostics must not expose private account paths or unrelated SavedVariables.
 
 The WoW client owns SavedVariables serialization. Addon code only updates the
 in-memory `GamersTrackerForeverDB` table; it cannot write arbitrary files or
-make arbitrary HTTP requests. Future server synchronization must use an
-explicit export after SavedVariables flush and a companion desktop uploader,
-or another approved bridge.
+make arbitrary HTTP requests. The optional, separate local sync prototype
+parses only this addon's persisted SavedVariables, exports complete versioned
+JSON documents per character, and uploads them to an authenticated loopback
+SQLite server. It cannot force a SavedVariables flush or silently refresh the
+in-game UI. See [local sync](sync-local.md) for the precise contract and limits.
 
 ### 7.1 Storage mechanism
 
@@ -340,7 +343,34 @@ The addon shall modify a Lua table in memory. WoW owns disk serialization.
 
 The ten-minute reconciliation timer is not a disk-save guarantee. The addon shall not force `/reload` during gameplay.
 
-### 7.2 Database shape
+### 7.2 Optional local sync prototype
+
+The companion sync is a separate, optional tool and is not an addon capability.
+It reads only the explicitly configured `GamersTrackerForever.lua` SavedVariables
+file after the WoW client has persisted it. The exporter parses the literal-table
+subset emitted by WoW without evaluating Lua, validates the database, and emits
+one versioned JSON snapshot per character. Exported snapshots omit UI settings
+and full item-link strings. Unknown/unscanned data remains distinct from verified
+empty data.
+
+With a server URL and token configured, the companion uploads complete character
+documents to the Python server at `127.0.0.1` (default port `8765`). The server
+requires a bearer token, validates document size and schema, and stores each
+document in SQLite by owner, product, and character key. Content hashes make
+unchanged uploads idempotent; changed documents receive a new server revision.
+The default deployment is local-only and is not suitable for direct public
+exposure. The token, SQLite database, and exported JSON belong in a private
+directory outside the addon and repository.
+
+The companion may poll at a configured interval, but it only sees data already
+written to disk. It does not force `/reload`, read the addon's in-memory table,
+or update the running UI. There is no remote import, account conflict
+resolution, remote deletion, multi-writer policy, or production cloud service.
+See [local sync](sync-local.md) for operation and the exact snapshot contract;
+the motivating research in [sync architecture research](sync-architecture-research.md)
+is retained as a design record.
+
+### 7.3 Database shape
 
 ```lua
 GamersTrackerForeverDB = {
@@ -418,7 +448,7 @@ GamersTrackerForeverDB = {
 }
 ```
 
-### 7.3 Identity rules
+### 7.4 Identity rules
 
 - Use the character GUID as the primary technical key when available.
 - Classic fallback: normalized realm + character name + faction.
@@ -427,7 +457,7 @@ GamersTrackerForeverDB = {
 - Transfer compatibility shall be represented by `transferGroup`, calculated by the active client adapter.
 - Classic and Forever data shall never share the same product namespace.
 
-### 7.4 Database integrity
+### 7.5 Database integrity
 
 - Validate every loaded root and record type.
 - Apply versioned forward migrations.
@@ -515,9 +545,10 @@ reagent list with icons, names, and owned/required quantities. No character
 identity, profession rank, craftability status sentence, or raw item ID appears
 in this item view. If an item name is not cached, omit the name and show only
 the icon and quantity; keep the ID internally for lookup and tooltip.
-When the client reports the crafted item's quality, tint the output name and a
-circular border around its icon with the matching item-quality color (for
-example, green for an uncommon item). Unknown quality keeps a neutral display.
+The output artwork is circularly masked, with a profession-style frame around
+it. When the client reports the crafted item's quality, tint the output name
+and select the matching frame color (for example, green for an uncommon item).
+Unknown quality keeps a neutral frame and name.
 
 Below it, a separate **Who has the materials** subpanel groups holdings by
 character. Include only a character with a positive known quantity for at
@@ -539,8 +570,12 @@ main view.
 └
 ```
 
-The output item and each material offer a native WoW tooltip beside the
-hovered item. When available, the client's equipped-item comparison may appear.
+The output item and each material offer a native WoW tooltip above and to the
+right of the hovered icon; recipe-row hover also opens that item's tooltip.
+Tooltips are clamped to the screen. The output's equipped-item comparison
+remains enabled and is placed to the right of the tooltip chain so it does not
+cover the character tree. Other item's comparisons retain native client
+placement.
 
 For an equippable output, show a small red cross by the recipe name **only**
 when item classification and the *currently logged-in* character's class
@@ -627,7 +662,9 @@ Responsibilities:
   uncached/unknown item data does not produce a false cross. The badge follows
   the currently logged-in character, not the selected recipe crafter.
 - Recipe row, output icon, and reagent icon open native item tooltips beside
-  the hovered item; output equipment comparison remains available.
+  the hovered item; output tooltip opens above/right of the icon and its
+  equipped-item comparison stays to the tooltip's right without covering the
+  character tree.
 - No raw item ID, profession rank, character summary, or Now/After transfer
   summary appears in selected-item detail. The separate holdings block shows
   only positive owners, grouped by nickname with material icons and counts.
@@ -658,6 +695,18 @@ Responsibilities:
 - Corrupt fixture records are isolated without destroying healthy records.
 - Schema migration preserves all characters, recipes, and inventory, including
   records that an older release marked untracked.
+
+### Optional local sync companion
+
+- The exporter parses literal SavedVariables and rejects executable Lua,
+  duplicate keys, oversized input, and invalid snapshot shapes.
+- Verified-empty bags/recipes export as empty collections; unscanned or
+  unsupported sections remain unknown.
+- Private UI settings and full item links are excluded from snapshots.
+- Identical uploads keep their revision; changed per-character content
+  increments it, and requests without the bearer token are rejected.
+- The companion polls only the configured saved file and never edits it or
+  claims to refresh the active addon UI.
 
 ## 13. Forever beta release gate
 

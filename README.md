@@ -26,9 +26,10 @@ the tested beta build.
 
 Snapshots are stored locally in the account-wide `GamersTrackerForeverDB`
 SavedVariables table. WoW serializes it on `/reload`, logout, clean exit, or
-disconnect. Addons cannot perform arbitrary HTTP requests; future server sync
-would require an explicit export after SavedVariables flush and a companion
-desktop uploader, or another approved bridge.
+disconnect. Addons cannot perform arbitrary HTTP requests. An optional
+[local sync prototype](docs/sync-local.md) now exports persisted per-character
+JSON and uploads it to a loopback-only SQLite server; this is separate from the
+addon and does not yet import remote data into the in-game UI.
 
 ## Install
 
@@ -57,6 +58,8 @@ Enable **GamersTrackerForever** on the character-selection AddOns screen, then u
   local beta-client findings and release gates.
 - [`docs/forever-beta-probe.md`](docs/forever-beta-probe.md) — safe in-client
   probe procedure.
+- [`docs/sync-local.md`](docs/sync-local.md) — optional local companion/server
+  setup and current sync limitations.
 
 ## Current validation status
 

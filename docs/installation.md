@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.19 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.20 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.19.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.20.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`

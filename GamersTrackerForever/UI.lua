@@ -126,6 +126,13 @@ local ITEM_QUALITY_COLORS_FALLBACK = {
   [4] = { 0.64, 0.21, 0.93 }, [5] = { 1, 0.5, 0 },
 }
 
+local PROFESSION_ICON_ATLAS = {
+  [2] = "Professions-Slot-Frame-Green",
+  [3] = "Professions-Slot-Frame-Blue",
+  [4] = "Professions-Slot-Frame-Epic",
+  [5] = "Professions-Slot-Frame-Legendary",
+}
+
 local function outputQualityColor(self, recipe)
   local itemID = recipe and tonumber(recipe.outputItemID)
   if not itemID or itemID <= 0 then return nil end
@@ -144,18 +151,18 @@ local function outputQualityColor(self, recipe)
   if type(env.GetItemQualityColor) == "function" then
     local ok, r, g, b = pcall(env.GetItemQualityColor, quality)
     if ok and type(r) == "number" and type(g) == "number" and type(b) == "number" then
-      return r, g, b
+      return r, g, b, quality
     end
   end
   local native = type(env.ITEM_QUALITY_COLORS) == "table" and env.ITEM_QUALITY_COLORS[quality]
   if type(native) == "table" then
     local r, g, b = native.r or native[1], native.g or native[2], native.b or native[3]
     if type(r) == "number" and type(g) == "number" and type(b) == "number" then
-      return r, g, b
+      return r, g, b, quality
     end
   end
   local fallback = ITEM_QUALITY_COLORS_FALLBACK[quality]
-  if fallback then return fallback[1], fallback[2], fallback[3] end
+  if fallback then return fallback[1], fallback[2], fallback[3], quality end
   return nil
 end
 
@@ -167,7 +174,7 @@ local function wearabilityMarker(self, recipe)
   return status == "unwearable" and " |cffff4040×|r" or ""
 end
 
-local function attachItemTooltip(self, frame, itemID, itemLink, iconInset)
+local function attachItemTooltip(self, frame, itemID, itemLink, keepComparisonOnRight)
   itemID = tonumber(itemID)
   if not itemID or itemID <= 0 then return end
   frame:EnableMouse(true)
@@ -180,19 +187,44 @@ local function attachItemTooltip(self, frame, itemID, itemLink, iconInset)
     if type(tooltip.SetPoint) == "function" then
       tooltip:SetOwner(owner, "ANCHOR_NONE")
       if type(tooltip.ClearAllPoints) == "function" then tooltip:ClearAllPoints() end
-      if iconInset then
-        tooltip:SetPoint("TOPLEFT", owner, "TOPLEFT", iconInset, 0)
-      else
-        tooltip:SetPoint("TOPLEFT", owner, "TOPRIGHT", 6, 0)
+      if type(tooltip.SetClampedToScreen) == "function" then
+        tooltip:SetClampedToScreen(true)
       end
+      -- Match the native profession tooltip: above and to the right of the
+      -- hovered item, leaving the recipe detail below it unobscured.
+      tooltip:SetPoint("BOTTOMLEFT", owner, "TOPRIGHT", 0, 0)
     else
       tooltip:SetOwner(owner, "ANCHOR_RIGHT")
     end
     local ok = pcall(tooltip.SetHyperlink, tooltip, link)
     if ok then
       tooltip:Show()
-      local compare = self.env and self.env.GameTooltip_ShowCompareItem or GameTooltip_ShowCompareItem
-      if type(compare) == "function" then pcall(compare, tooltip) end
+      local compare = self.env and self.env.GameTooltip_ShowCompareItem
+        or GameTooltip_ShowCompareItem
+      if type(compare) == "function" then
+        pcall(compare, tooltip)
+        if keepComparisonOnRight then
+          -- WoW may place the equipped-item comparison to the left based on
+          -- its own screen heuristic, even when there is room on the right.
+          -- Keep the comparison beside this detail tooltip so it does not
+          -- cover the character tree. Do not reset its owner or contents.
+          local shoppingTooltips = tooltip.shoppingTooltips
+          if type(shoppingTooltips) ~= "table" then
+            shoppingTooltips = { ShoppingTooltip1, ShoppingTooltip2 }
+          end
+          local anchor = tooltip
+          for _, shoppingTooltip in ipairs(shoppingTooltips) do
+            if shoppingTooltip and type(shoppingTooltip.IsShown) == "function"
+              and shoppingTooltip:IsShown()
+              and type(shoppingTooltip.ClearAllPoints) == "function"
+              and type(shoppingTooltip.SetPoint) == "function" then
+              shoppingTooltip:ClearAllPoints()
+              shoppingTooltip:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 0, -10)
+              anchor = shoppingTooltip
+            end
+          end
+        end
+      end
     else
       tooltip:Hide()
     end
@@ -638,26 +670,44 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
   self.detailRows[#self.detailRows + 1] = itemPanel
 
   local outputButton = CreateFrame("Button", nil, itemPanel)
-  outputButton:SetSize(42, 42); outputButton:SetPoint("TOPLEFT", itemPanel, 14, -14)
+  outputButton:SetSize(52, 52); outputButton:SetPoint("TOPLEFT", itemPanel, 14, -12)
   local icon = outputButton:CreateTexture(nil, "ARTWORK")
-  icon:SetSize(42, 42); icon:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
+  icon:SetSize(44, 44); icon:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
   setIcon(icon, recipe and recipe.icon or recipeRow.icon)
-  local qualityR, qualityG, qualityB = outputQualityColor(self, recipe)
-  if qualityR then
-    local ring = outputButton:CreateTexture(nil, "OVERLAY")
-    ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    -- This texture's circular artwork is offset inside its bounds. Blizzard's
-    -- 52px border sits TOPLEFT on a 32px button; retain that ratio for 42px.
-    ring:SetSize(68, 68); ring:SetPoint("TOPLEFT", outputButton, "TOPLEFT", 0, 0)
-    if type(ring.SetVertexColor) == "function" then
-      ring:SetVertexColor(qualityR, qualityG, qualityB, 1)
+  self.outputItemIcon = icon
+  if type(outputButton.CreateMaskTexture) == "function" and type(icon.AddMaskTexture) == "function" then
+    local ok, mask = pcall(outputButton.CreateMaskTexture, outputButton, nil, "ARTWORK")
+    if ok and mask then
+      mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+      mask:SetSize(44, 44); mask:SetPoint("CENTER", icon, "CENTER", 0, 0)
+      pcall(icon.AddMaskTexture, icon, mask)
     end
-    self.outputQualityRing = ring
   end
-  attachItemTooltip(self, outputButton, recipe and recipe.outputItemID, recipe and recipe.outputItemLink)
+  local qualityR, qualityG, qualityB, quality = outputQualityColor(self, recipe)
+  local ring = outputButton:CreateTexture(nil, "BACKGROUND")
+  ring:SetSize(56, 56); ring:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
+  local atlas = PROFESSION_ICON_ATLAS[quality] or "Professions-Slot-Frame"
+  local atlasKnown = true
+  local env = self.env or _G
+  if type(env.GetAtlasInfo) == "function" then
+    local ok, info = pcall(env.GetAtlasInfo, atlas)
+    atlasKnown = ok and info ~= nil
+  end
+  local atlasApplied = atlasKnown and type(ring.SetAtlas) == "function"
+    and pcall(ring.SetAtlas, ring, atlas, false)
+  if not atlasApplied then
+    -- Older clients can still draw a circular quality rim without the atlas.
+    ring:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+    if type(ring.SetVertexColor) == "function" then
+      ring:SetVertexColor(qualityR or 0.72, qualityG or 0.62, qualityB or 0.42, 1)
+    end
+  end
+  self.outputQualityRing = ring
+  attachItemTooltip(self, outputButton, recipe and recipe.outputItemID,
+    recipe and recipe.outputItemLink, true)
   self.outputItemButton = outputButton
-  local title = label(itemPanel, "GameFontHighlightLarge", "TOPLEFT", itemPanel, 68, -19,
-    width - 94, 25)
+  local title = label(itemPanel, "GameFontHighlightLarge", "TOPLEFT", itemPanel, 80, -19,
+    width - 106, 25)
   title:SetText(recipeRow.name .. wearabilityMarker(self, recipe))
   if qualityR and type(title.SetTextColor) == "function" then
     title:SetTextColor(qualityR, qualityG, qualityB)
@@ -712,7 +762,10 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
     local card = CreateFrame("Frame", nil, itemPanel)
     card:SetPoint("TOPLEFT", itemPanel, 16, -92 - (index - 1) * 46)
     card:SetSize(cardWidth, 42)
-    attachItemTooltip(self, card, material.itemID, material.link, 38)
+    local itemButton = CreateFrame("Button", nil, card)
+    itemButton:SetSize(38, 38); itemButton:SetPoint("TOPLEFT", card, 0, -2)
+    card.itemButton = itemButton
+    attachItemTooltip(self, itemButton, material.itemID, material.link)
     local materialIcon = card:CreateTexture(nil, "ARTWORK")
     materialIcon:SetSize(38, 38); materialIcon:SetPoint("TOPLEFT", card, 0, -2)
     setIcon(materialIcon, material.icon)
@@ -830,7 +883,7 @@ end
 function UI:RefreshDetail(productKey, product, characterKey)
   hideRows(self.detailRows); self.detailRows = {}; self.materialCards = {}; self.sourceRows = {}
   self.sourceCards = {}; self.sourcePanel = nil; self.outputItemButton = nil
-  self.outputQualityRing = nil; self.outputItemTitle = nil
+  self.outputQualityRing = nil; self.outputItemTitle = nil; self.outputItemIcon = nil
   local settings = self.repository and self.repository.db and self.repository.db.settings or {}
   local model = GTF.ViewModels.BuildCharacterDetail(product, characterKey, {
     now = now(self.env), settings = settings, includeInventoryRows = false,
