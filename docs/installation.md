@@ -1,11 +1,12 @@
-# GamersTrackerForever 0.2.1 — Classic Era / Season of Discovery installation
+# GamersTrackerForever 0.3.0 — Classic Era / SoD / WoW Forever installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.2.1-classic.zip` so it creates exactly:
-   `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
-3. Start the Classic Era client and enable **GamersTrackerForever** on the character-selection AddOns list. The package targets interface **11509**.
+2. Copy the `GamersTrackerForever` folder so it creates exactly one of:
+   - Classic Era: `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
+   - WoW Forever beta: `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
+3. Start the client and enable **GamersTrackerForever** on the character-selection AddOns list. The TOC lists interfaces **11509** (Classic Era) and **16001** (Forever, inferred from `1.60.1`). If Forever lists the addon as out of date, tick **Load out of date AddOns** and report the interface shown by `/gtf status`.
 
 ## Use
 
@@ -46,7 +47,11 @@ Material totals distinguish bags from bank, compatible transfer ecosystems from 
 - All eight fixture harnesses and the SoD static regression check pass. Complete
   in-client validation still requires the checklist in
   `tests\classic-era-acceptance-checklist.md`.
-- The installed Forever beta is build `1.60.1.69913` (`wow_classic_beta`). It
-  deliberately fails closed: only `/gtf probe` and `/gtf status` are active
-  until its runtime interface/API results justify a dedicated adapter. No
-  Forever support is claimed yet.
+- WoW Forever (`1.60.x` builds, e.g. beta `1.60.1.69913`) selects the Forever
+  adapter: it reuses the Classic profession/container APIs, stores data in a
+  separate `forever` product partition, drops realm from identity, and pools
+  materials only within the same region, ruleset (normal vs Hardcore), and
+  faction. It still needs the in-client release gate in
+  `docs/forever-beta-compatibility.md`; run `/gtf probe` if a profession or
+  bag scan reports unsupported. Any other unknown client family fails closed.
+- Enchanting (Classic `Craft` window) is scanned alongside trade skills.

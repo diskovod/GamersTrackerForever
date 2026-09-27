@@ -284,7 +284,8 @@ Scanner.RefreshProfessionRanks = Scanner.RefreshRanks
 
 function Scanner:_expand(index)
   local env = self.env or (self.api and self.api.env) or _G
-  local names = { "ExpandTradeSkillSubClass", "ExpandTradeSkillCategory" }
+  local source = self.api and type(self.api.GetTradeSourceNames) == "function" and self.api:GetTradeSourceNames()
+  local names = source and source.expand or { "ExpandTradeSkillSubClass", "ExpandTradeSkillCategory" }
   for _, name in ipairs(names) do
     if type(env[name]) == "function" then
       local ok = pcall(env[name], index)
@@ -540,7 +541,22 @@ Scanner.ScanLoaded = Scanner.ScanLoadedProfession
 Scanner.ScanLoadedTradeSkill = Scanner.ScanLoadedProfession
 Scanner.ScanRecipes = Scanner.ScanLoadedProfession
 
+-- Trade-skill and Craft windows share one pending scan.  Switching family
+-- first flushes the other window's pending scan against its own API.
+function Scanner:_useSource(source)
+  local api = self.api
+  if not api or type(api.SetTradeSource) ~= "function" then return end
+  if api:GetTradeSource() ~= source and self.pendingTradeScan then self:FlushPendingTradeSkill() end
+  api:SetTradeSource(source)
+end
+
 function Scanner:HandleEvent(event, ...)
+  if event == "CRAFT_SHOW" or event == "CRAFT_UPDATE" or event == "CRAFT_CLOSE" then
+    self:_useSource("craft")
+    event = event:gsub("^CRAFT_", "TRADE_SKILL_")
+  elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" or event == "TRADE_SKILL_CLOSE" then
+    self:_useSource("trade")
+  end
   if event == "SKILL_LINES_CHANGED" then
     self:MarkStale()
     return self:RefreshRanks()

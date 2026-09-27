@@ -213,15 +213,52 @@ function Classic:GetProfessionEntries()
 end
 
 Classic.EnumerateProfessions = Classic.GetProfessionEntries
+
+-- Classic Era serves most professions through the trade-skill window, but
+-- Enchanting (and Beast Training) use the separate Craft window.  The scanner
+-- selects the active family; the row methods below dispatch through it.
+local SOURCES = {
+  trade = {
+    line = "GetTradeSkillLine", count = "GetNumTradeSkills", info = "GetTradeSkillInfo",
+    recipeLink = "GetTradeSkillRecipeLink", itemLink = "GetTradeSkillItemLink",
+    icon = "GetTradeSkillIcon", numMade = "GetTradeSkillNumMade",
+    numReagents = "GetTradeSkillNumReagents", reagentInfo = "GetTradeSkillReagentInfo",
+    reagentLink = "GetTradeSkillReagentItemLink", expand = { "ExpandTradeSkillSubClass", "ExpandTradeSkillCategory" },
+  },
+  craft = {
+    line = "GetCraftDisplaySkillLine", count = "GetNumCrafts", info = "GetCraftInfo",
+    -- Enchant crafts expose |Henchant:ID| through GetCraftItemLink; item
+    -- crafts expose |Hitem:ID|.  ParseRecipeID/ParseItemID keep them apart.
+    recipeLink = "GetCraftRecipeLink", itemLink = "GetCraftItemLink",
+    icon = "GetCraftIcon", numMade = nil,
+    numReagents = "GetCraftNumReagents", reagentInfo = "GetCraftReagentInfo",
+    reagentLink = "GetCraftReagentItemLink", expand = { "ExpandCraftSkillLine" },
+  },
+}
+
+function Classic:SetTradeSource(source)
+  self.tradeSource = SOURCES[source] and source or "trade"
+  return self.tradeSource
+end
+
+function Classic:GetTradeSource()
+  return SOURCES[self.tradeSource] and self.tradeSource or "trade"
+end
+
+function Classic:GetTradeSourceNames()
+  return SOURCES[self:GetTradeSource()]
+end
 Classic.GetProfessionsSnapshot = Classic.GetProfessionEntries
 Classic.GetProfessionSkills = Classic.GetProfessionEntries
 
 function Classic:GetLoadedProfession()
   local env = self.env or _G
-  if not fn(env, "GetTradeSkillLine") then
+  local names = self:GetTradeSourceNames()
+  if not fn(env, names.line) then
     return nil, "trade-skill line API unavailable"
   end
-  local ok, name, rank, maxRank, numAbilities, spellOffset, skillLine, specialization = pcall(env.GetTradeSkillLine)
+  local ok, name, rank, maxRank, numAbilities, spellOffset, skillLine, specialization = pcall(env[names.line])
+  if names == SOURCES.craft then skillLine = nil end -- craft lines return only name, rank, maxRank
   if not ok or not name or name == "" then
     return nil, "no profession is loaded"
   end
@@ -242,17 +279,22 @@ function Classic:GetLoadedProfession()
       end
     end
   end
-  return professionRecord(0, name, nil, rank, maxRank, id, nil, "GetTradeSkillLine"), nil
+  -- The Craft window also serves Beast Training, which is not a profession.
+  if names == SOURCES.craft and not (positive(id) or isProfession(name, nil)) then
+    return nil, "loaded craft line is not a profession"
+  end
+  return professionRecord(0, name, nil, rank, maxRank, id, nil, names.line), nil
 end
 
 Classic.GetLoadedTradeSkill = Classic.GetLoadedProfession
 
 function Classic:GetTradeSkillCount()
   local env = self.env or _G
-  if not fn(env, "GetNumTradeSkills") then
+  local names = self:GetTradeSourceNames()
+  if not fn(env, names.count) then
     return nil, "trade-skill count API unavailable"
   end
-  local ok, count = pcall(env.GetNumTradeSkills)
+  local ok, count = pcall(env[names.count])
   if not ok then
     return nil, "trade-skill count failed"
   end
@@ -261,11 +303,17 @@ end
 
 function Classic:GetTradeSkillInfo(index)
   local env = self.env or _G
-  if not fn(env, "GetTradeSkillInfo") then
+  local names = self:GetTradeSourceNames()
+  if not fn(env, names.info) then
     return nil, "trade-skill row API unavailable"
   end
-  local ok, name, rowType, numAvailable, isExpanded, altVerb, numSkillUps =
-    pcall(env.GetTradeSkillInfo, index)
+  local ok, name, rowType, numAvailable, isExpanded, altVerb, numSkillUps
+  if names == SOURCES.craft then
+    -- name, subSpellName, craftType, numAvailable, isExpanded, trainingPointCost, requiredLevel
+    ok, name, altVerb, rowType, numAvailable, isExpanded = pcall(env[names.info], index)
+  else
+    ok, name, rowType, numAvailable, isExpanded, altVerb, numSkillUps = pcall(env[names.info], index)
+  end
   if not ok then
     return nil, "trade-skill row failed"
   end
@@ -280,31 +328,34 @@ function Classic:GetTradeSkillInfo(index)
   }
 end
 
-function Classic:GetTradeSkillRecipeLink(index)
+local function sourceCall(self, key, index)
   local env = self.env or _G
-  if not fn(env, "GetTradeSkillRecipeLink") then return nil end
-  local ok, link = pcall(env.GetTradeSkillRecipeLink, index)
-  return ok and link or nil
+  local name = self:GetTradeSourceNames()[key]
+  if not name or not fn(env, name) then return nil end
+  local ok, value = pcall(env[name], index)
+  return ok and value or nil
+end
+
+function Classic:GetTradeSkillRecipeLink(index)
+  local link = sourceCall(self, "recipeLink", index)
+  -- Classic Era craft rows carry the enchant link on GetCraftItemLink.
+  if not link and self:GetTradeSource() == "craft" then link = sourceCall(self, "itemLink", index) end
+  return link
 end
 
 function Classic:GetTradeSkillItemLink(index)
-  local env = self.env or _G
-  if not fn(env, "GetTradeSkillItemLink") then return nil end
-  local ok, link = pcall(env.GetTradeSkillItemLink, index)
-  return ok and link or nil
+  return sourceCall(self, "itemLink", index)
 end
 
 function Classic:GetTradeSkillIcon(index)
-  local env = self.env or _G
-  if not fn(env, "GetTradeSkillIcon") then return nil end
-  local ok, icon = pcall(env.GetTradeSkillIcon, index)
-  return ok and icon or nil
+  return sourceCall(self, "icon", index)
 end
 
 function Classic:GetTradeSkillNumMade(index)
   local env = self.env or _G
-  if not fn(env, "GetTradeSkillNumMade") then return 1, 1 end
-  local ok, minimum, maximum = pcall(env.GetTradeSkillNumMade, index)
+  local name = self:GetTradeSourceNames().numMade
+  if not name or not fn(env, name) then return 1, 1 end
+  local ok, minimum, maximum = pcall(env[name], index)
   if not ok then return nil, nil end
   minimum = positive(minimum) or 1
   maximum = positive(maximum) or minimum
@@ -314,30 +365,31 @@ end
 
 function Classic:GetTradeSkillReagents(index)
   local env = self.env or _G
-  if not fn(env, "GetTradeSkillNumReagents") then
+  local names = self:GetTradeSourceNames()
+  if not fn(env, names.numReagents) then
     return nil, "reagent count API unavailable"
   end
-  local ok, count = pcall(env.GetTradeSkillNumReagents, index)
+  local ok, count = pcall(env[names.numReagents], index)
   if not ok then return nil, "reagent count failed" end
   count = tonumber(count)
   if count == nil or count < 0 then return nil, "reagent count unavailable" end
-  if count > 0 and (not fn(env, "GetTradeSkillReagentInfo")
-    or not fn(env, "GetTradeSkillReagentItemLink")) then
+  if count > 0 and (not fn(env, names.reagentInfo)
+    or not fn(env, names.reagentLink)) then
     return nil, "reagent detail API unavailable"
   end
   local result = {}
   for reagentIndex = 1, count do
     local name, texture, required, playerCount
-    if fn(env, "GetTradeSkillReagentInfo") then
+    if fn(env, names.reagentInfo) then
       local infoOK
-      infoOK, name, texture, required, playerCount = pcall(env.GetTradeSkillReagentInfo, index, reagentIndex)
+      infoOK, name, texture, required, playerCount = pcall(env[names.reagentInfo], index, reagentIndex)
       if not infoOK then return nil, "reagent info failed" end
     end
     if tonumber(required) == nil then return nil, "reagent quantity unavailable" end
     local link
-    if fn(env, "GetTradeSkillReagentItemLink") then
+    if fn(env, names.reagentLink) then
       local linkOK
-      linkOK, link = pcall(env.GetTradeSkillReagentItemLink, index, reagentIndex)
+      linkOK, link = pcall(env[names.reagentLink], index, reagentIndex)
       if not linkOK then return nil, "reagent link failed" end
     end
     result[#result + 1] = {
@@ -360,7 +412,8 @@ function Classic:GetCapabilities()
   local env = self.env or _G
   local professionEnumeration = (fn(env, "GetProfessions") and fn(env, "GetProfessionInfo"))
     or (fn(env, "GetNumSkillLines") and fn(env, "GetSkillLineInfo"))
-  local recipeScan = fn(env, "GetTradeSkillLine") and fn(env, "GetNumTradeSkills") and fn(env, "GetTradeSkillInfo")
+  local recipeScan = (fn(env, "GetTradeSkillLine") and fn(env, "GetNumTradeSkills") and fn(env, "GetTradeSkillInfo"))
+    or (fn(env, "GetCraftDisplaySkillLine") and fn(env, "GetNumCrafts") and fn(env, "GetCraftInfo"))
   capabilities[GTF.CAPABILITY and GTF.CAPABILITY.PROFESSION_ENUMERATION or "profession_enumeration"] = professionEnumeration
   capabilities[GTF.CAPABILITY and GTF.CAPABILITY.LEARNED_RECIPE_SCAN or "learned_recipe_scan"] = recipeScan
   return capabilities

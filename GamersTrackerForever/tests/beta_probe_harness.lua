@@ -4,7 +4,7 @@ local calls = { bank = 0, item = 0 }
 
 function GetBuildInfo() return "1.60.1", "70001", "fixture", 120001 end
 -- Forever beta may reuse the Classic project id; the build-family gate must
--- still refuse to select the Classic adapter.
+-- select the Forever adapter, never the Classic one.
 WOW_PROJECT_ID = 2
 WOW_PROJECT_FOREVER = 2
 WOW_PROJECT_CLASSIC_ERA = 2
@@ -39,7 +39,7 @@ C_Container = {
     return nil
   end,
 }
-GamersTrackerForeverDB = { products = { ["unsupported:2"] = { characters = {} }, classic_era = {} } }
+GamersTrackerForeverDB = { products = { forever = { characters = {} }, classic_era = {} } }
 
 local files = { "Constants.lua", "ApiCompat.lua", "ApiCompatInventory.lua", "ApiCompatProfessions.lua", "BetaProbe.lua" }
 for _, file in ipairs(files) do
@@ -49,8 +49,11 @@ for _, file in ipairs(files) do
 end
 
 local api, product = GamersTrackerForever.ApiCompat.Detect(_G)
-assert(product == "unsupported:2")
-assert(not api:IsSupported())
+assert(product == "forever" and api:IsSupported())
+local context = api:GetCurrentContext()
+assert(context.identity.displayName == "BetaTester-Forever Realm" and context.identity.realm == nil)
+assert(context.transferGroup == "forever|unknown|normal|horde", context.transferGroup)
+assert(context.key == "Player-99-0001")
 local probe = GamersTrackerForever.BetaProbe:Create(_G, api)
 assert(calls.bank == 0 and calls.item == 0, "probe must be inert until run")
 local result = probe:Run()
@@ -67,18 +70,35 @@ local lines = probe:FormatLines(result)
 local output = table.concat(lines, "\n")
 assert(not output:match("Copper") and not output:match("Item Name") and not output:match("secret"))
 
--- Bootstrap must fail closed as well as detection: no Classic services are
--- constructed and the unsupported partition cannot be created by a writer.
-for _, file in ipairs({ "EventDispatcher.lua", "SlashCommands.lua", "Repository.lua", "Bootstrap.lua" }) do
-  local chunk, err = loadfile(file)
-  assert(chunk, err)
-  chunk()
+-- Forever bootstrap constructs the scanner graph in its own partition.
+local bootFiles = { "Constants.lua", "ApiCompat.lua", "ApiCompatInventory.lua", "ApiCompatProfessions.lua",
+  "BetaProbe.lua", "EventDispatcher.lua", "Repository.lua", "CharacterService.lua", "InventoryScanner.lua",
+  "ProfessionScanner.lua", "CraftabilityService.lua", "RecipeCatalog.lua", "ViewModels.lua", "SlashCommands.lua",
+  "Bootstrap.lua" }
+local function boot()
+  GamersTrackerForever = nil
+  for _, file in ipairs(bootFiles) do
+    local chunk, err = loadfile(file)
+    assert(chunk, err)
+    chunk()
+  end
+  assert(GamersTrackerForever:Initialize())
+  return GamersTrackerForever
 end
-assert(GamersTrackerForever:Initialize())
-assert(GamersTrackerForever.product == "unsupported:2")
-assert(GamersTrackerForever.Inventory == nil and GamersTrackerForever.Characters == nil)
-assert(GamersTrackerForever.Repository:IsReadOnly())
-assert(GamersTrackerForever.Repository:GetProduct("unsupported:2", true) ~= nil)
-assert(GamersTrackerForever.Repository:GetCharacter("unsupported:2", "must-not-save", true) == nil)
-assert(GamersTrackerForever.Repository:GetProduct("unsupported:2", false).characters["must-not-save"] == nil)
+local GTF = boot()
+assert(GTF.product == "forever")
+assert(not GTF.Repository:IsReadOnly())
+assert(GTF.Characters ~= nil and GTF.Professions ~= nil)
+assert(GTF.Repository:GetCharacter("forever", "must-save", true) ~= nil)
+
+-- Unknown client families still fail closed: no scanners, read-only partition.
+function GetBuildInfo() return "2.5.4", "70001", "fixture", 20504 end
+WOW_PROJECT_ID = 5
+GamersTrackerForeverDB = { products = { ["unsupported:5"] = { characters = {} } } }
+GTF = boot()
+assert(GTF.product == "unsupported:5" and not GTF.Api:IsSupported())
+assert(GTF.Inventory == nil and GTF.Characters == nil)
+assert(GTF.Repository:IsReadOnly())
+assert(GTF.Repository:GetCharacter("unsupported:5", "must-not-save", true) == nil)
+assert(GTF.Repository:GetProduct("unsupported:5", false).characters["must-not-save"] == nil)
 print("GamersTrackerForever beta probe harness: PASS")

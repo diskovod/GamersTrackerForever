@@ -317,7 +317,7 @@ function UI:RefreshDetail(productKey, product, characterKey)
   end
   if model.empty then add(model.title or "No character selected", "GameFontHighlight"); add(model.message or "Select a character from the list.", "GameFontNormalSmall"); self.detailContent:SetHeight(80); return end
   add(model.name .. " — level " .. tostring(model.level) .. " " .. text(model.className, "class unknown"), "GameFontHighlightLarge")
-  add(text(model.realm, "Realm unknown") .. " | " .. text(model.faction, "Faction unknown") .. " | " .. (model.tracked and "tracked" or "not tracked"))
+  add(text(model.realm, model.ruleset and ("Forever " .. model.ruleset) or "Realm unknown") .. " | " .. text(model.faction, "Faction unknown") .. " | " .. (model.tracked and "tracked" or "not tracked"))
   add("Last seen: " .. GTF.ViewModels.FormatTimestamp(model.lastSeenAt, self.env) .. " | Bags: " .. model.bagsFreshness.label .. " | Bank: " .. model.bankFreshness.label, "GameFontNormalSmall")
   local track = button(self.detailContent, model.tracked and "Untrack" or "Track", 86, 22); track:SetPoint("TOPLEFT", 8, y - 2); track:SetScript("OnClick", function() local ok, err = self:SetTracked(model.key, not model.tracked); self.statusMessage = ok and nil or err; self:Refresh() end); self.detailRows[#self.detailRows + 1] = track
   local forget = button(self.detailContent, "Forget", 70, 22); forget:SetPoint("LEFT", track, "RIGHT", 5, 0); forget:SetScript("OnClick", function() self:ConfirmForget(productKey, model.key, model.name) end); self.detailRows[#self.detailRows + 1] = forget
