@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.15 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.16 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.15.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.16.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -36,9 +36,10 @@
   A small class icon identifies each character. A red X marks equipment the
   currently logged-in character cannot wear when the item type is known;
   unknown or uncached items are not marked. The main UI has no Forget button.
-  If a material name is not cached or saved from a profession scan, it appears
-  as “Unknown material,” not a numeric item ID; reopening the profession can
-  populate its name when the client provides it.
+  If a material name is not cached or saved from a profession scan, the item
+  panel shows only its icon and owned/required count; it does not show an
+  “Unknown material” label or numeric item ID. Reopening the profession can
+  populate the name when the client provides it.
 
 ## Data and freshness
 

@@ -2,7 +2,7 @@
 
 **Version:** 1.3 (selected-item presentation revision)
 
-**Status:** Implemented in 0.3.0-beta.15; client acceptance remains partial
+**Status:** Implemented in 0.3.0-beta.16; client acceptance remains partial
 
 **Updated:** 2026-09-27
 
@@ -515,8 +515,8 @@ The selected recipe uses a visually framed item block resembling the native
 profession detail: output icon and item name at the top, followed by a compact
 reagent list with icons, names, and owned/required quantities. No character
 identity, profession rank, craftability status sentence, or raw item ID appears
-in this item view. If an item name is not cached, display a neutral unknown
-label; keep the ID internally for lookup and tooltip.
+in this item view. If an item name is not cached, omit the name and show only
+the icon and quantity; keep the ID internally for lookup and tooltip.
 
 Below it, a separate **Who has the materials** subpanel groups holdings by
 character. Include only a character with a positive known quantity for at

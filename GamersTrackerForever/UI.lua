@@ -636,10 +636,13 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
     local materialIcon = card:CreateTexture(nil, "ARTWORK")
     materialIcon:SetSize(38, 38); materialIcon:SetPoint("TOPLEFT", card, 0, -2)
     setIcon(materialIcon, material.icon)
-    local materialName = text(material.name, "Unknown material")
-    if materialName:match("^Item%s+%d+$") then materialName = "Unknown material" end
+    local materialName = text(material.name)
+    if materialName == "Unknown material" or materialName:match("^Item%s+%d+$") then
+      materialName = ""
+    end
     local caption = label(card, "GameFontHighlightSmall", "LEFT", card, 50, 0, cardWidth - 54, 38)
-    caption:SetText(tostring(material.nowOwned or 0) .. "/" .. tostring(material.required) .. " " .. materialName)
+    caption:SetText(tostring(material.nowOwned or 0) .. "/" .. tostring(material.required)
+      .. (materialName ~= "" and (" " .. materialName) or ""))
     self.materialCards[#self.materialCards + 1] = card
   end
   itemPanel:SetHeight(104 + #materialRows * 46)
@@ -724,7 +727,9 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
         if type(tooltip.AddLine) == "function" then
           local bags, bagsMeta = GTF.ViewModels.FormatMaterialCell(entry.character, "bags", self.env)
           local bank, bankMeta = GTF.ViewModels.FormatMaterialCell(entry.character, "bank", self.env)
-          tooltip:AddLine(group.name .. " — " .. entry.material.name)
+          local materialName = text(entry.material.name)
+          if materialName == "Unknown material" then materialName = "" end
+          tooltip:AddLine(group.name .. (materialName ~= "" and (" — " .. materialName) or ""))
           tooltip:AddLine(bagsMeta.tooltip or text(bags))
           tooltip:AddLine(bankMeta.tooltip or text(bank))
         end

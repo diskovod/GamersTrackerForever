@@ -291,6 +291,12 @@ same(ui.sourceRows[1].gtfOwned, 24, "character material amount includes known ba
 same(ui.sourceRows[1].gtfCharacterKey, "ana", "holding stays grouped under its nickname")
 assert(ui.sourceRows[1].gtfItemButton and type(ui.sourceRows[1].gtfItemButton.scripts.OnEnter) == "function",
   "holding icon keeps the native item tooltip")
+ui.env.GetItemInfo = function() return nil end
+ui:Refresh()
+same(ui.materialCards[1].fontStrings[1].text, "4/10",
+  "uncached reagent keeps its count without showing Unknown material")
+ui.env.GetItemInfo = function() return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555 end
+ui:Refresh()
 ui:SelectCharacter("ana")
 assert(ui.selectedRecipeKey == nil, "selecting a character returns to its overview")
 same(#ui.sourceCards, 0, "character overview clears stale item-holder cards")
