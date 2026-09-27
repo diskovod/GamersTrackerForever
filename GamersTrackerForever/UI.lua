@@ -273,7 +273,11 @@ function UI:CreateRecipeControls()
   label(controls, "GameFontNormalSmall", "TOPLEFT", controls, 2, -31, 58, 18):SetText("Transfer")
   self.recipeTransfer = editBox(controls, 170, 22); self.recipeTransfer:SetPoint("TOPLEFT", 62, -26)
   controls:SetHeight(54)
-  local function changed() if self.frame and self.frame:IsShown() and self.tab == "recipes" then self:RefreshRecipes() end end
+  local function changed()
+    if self.frame and self.frame:IsShown() and self.tab == "recipes" then
+      self:RefreshRecipes(getProduct(self))
+    end
+  end
   self.recipeSearch:SetScript("OnTextChanged", changed); self.recipeProfession:SetScript("OnTextChanged", changed)
   self.recipeCharacter:SetScript("OnTextChanged", changed); self.recipeStatus:SetScript("OnTextChanged", changed); self.recipeTransfer:SetScript("OnTextChanged", changed)
 end
@@ -622,6 +626,7 @@ function UI:ConfirmForget(productKey, characterKey, displayName)
 end
 
 function UI:RefreshRecipes(productKey, product)
+  if not product then productKey, product = getProduct(self) end
   hideRows(self.recipeRows); self.recipeRows = {}
   local recipeWidth = 500
   if self.rightPane and type(self.rightPane.GetWidth) == "function" then

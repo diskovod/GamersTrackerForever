@@ -118,6 +118,11 @@ end
 local incompleteRanks = api:GetProfessionEntries()
 assert(incompleteRanks == nil, "missing beta ranks must not become a zero snapshot")
 GetProfessionInfo = professionInfo
+local originalGetProfessions = GetProfessions
+GetProfessions = function() return nil end
+local unsettledRanks = api:GetProfessionEntries()
+assert(unsettledRanks == nil, "empty beta enumeration must not reconcile away learned recipes")
+GetProfessions = originalGetProfessions
 local probe = GamersTrackerForever.BetaProbe:Create(_G, api)
 assert(calls.bank == 0 and calls.item == 0, "probe must be inert until run")
 UnitFullName = function() return "Disko", "Lebowski" end
@@ -293,6 +298,12 @@ assert(alchemy and alchemy.name == "Alchemy" and alchemy.rank == 100 and alchemy
   "beta profession rank snapshot must persist")
 assert(fishing and fishing.name == "Fishing" and fishing.rank == 100 and fishing.maxRank == 300,
   "sparse profession slots must persist")
+alchemy.learnedRecipes["recipe:9001"] = true
+GetProfessions = function() return nil end
+local unsettledScan = GamersTrackerForever.Professions:RefreshRanks(1235)
+assert(not unsettledScan.success and betaCharacter.professions["profession:alchemy"].learnedRecipes["recipe:9001"],
+  "unsettled beta enumeration must preserve learned recipe flags")
+GetProfessions = originalGetProfessions
 GamersTrackerForever.Dispatcher:Dispatch("TRADE_SKILL_SHOW")
 GamersTrackerForever.Dispatcher:Dispatch("TRADE_SKILL_UPDATE")
 GamersTrackerForever.Dispatcher:Dispatch("TRADE_SKILL_CLOSE")

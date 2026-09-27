@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.9 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.10 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.9.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.10.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -54,9 +54,12 @@ Material totals distinguish bags from bank, compatible transfer ecosystems from 
 - The SoD static regression check passes. Complete
   in-client validation still requires the checklist in
   `tests\classic-era-acceptance-checklist.md`.
-- On Forever beta build 70009, live Blacksmithing and Cooking scans saved 22
-  and 4 learned recipes respectively; `/gtf status` reported 26 cached recipes.
-  Both profession snapshots survived `/reload` and Blacksmithing materials/holdings
-  appeared in the native UI. Bank scanning and transfer-group calculations
-  remain unavailable on this beta client. Other professions and Classic Era
-  still need in-client recipe regression testing.
+- On Forever beta build 70009, live Blacksmithing, Cooking, and First Aid scans
+  saved 22, 4, and 3 learned recipes respectively. The saved per-character
+  learned sets survived `/reload`, and recipe search and material details worked
+  in the native UI. An empty transient `GetProfessions()` response no longer
+  erases saved profession data. Mining's recipe list currently reports mixed
+  profession ownership, so the scanner preserves existing data instead of
+  claiming a complete scan. Bank scanning and transfer-group calculations
+  remain unavailable on this beta client. Classic Era still needs in-client
+  recipe regression testing.

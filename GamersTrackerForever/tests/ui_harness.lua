@@ -134,6 +134,14 @@ same(#ui.sourceRows, 3, "separate holdings panel includes every tracked characte
 ui:SelectCharacter("ana")
 assert(ui.selectedRecipeKey == nil, "selecting a character returns to its overview")
 ui.tab = "recipes"; ui:Refresh(); assert(ui.recipeScroll and ui.recipeContent, "recipes tab renders")
+-- Filter callbacks used to invoke RefreshRecipes without its product arguments,
+-- leaving the pane blank and raising a nil-product Lua error.
+assert(type(ui.recipeSearch.scripts.OnTextChanged) == "function")
+ui.recipeSearch:SetText("potion")
+ui.recipeSearch.scripts.OnTextChanged()
+assert(ui.recipeContent:GetHeight() > 1, "filter edit renders recipes without a nil product")
+ui:RefreshRecipes()
+assert(ui.recipeContent:GetHeight() > 1, "direct recipe refresh resolves product context")
 
 local beta = repo:GetProduct("forever_beta", true)
 beta.characters.beta = { tracked = true, identity = { displayName = "Beta Crafter" }, level = 20,

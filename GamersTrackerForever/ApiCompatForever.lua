@@ -179,6 +179,9 @@ function ForeverBeta:GetProfessionEntries()
     end
   end
   table.sort(entries, function(a, b) return a.name:lower() < b.name:lower() end)
+  -- The beta may return no profession indices while loading or reloading.
+  -- Treat that as unsettled data, not proof the character abandoned every skill.
+  if #entries == 0 then return nil, "Forever beta profession enumeration is not ready" end
   return entries
 end
 
