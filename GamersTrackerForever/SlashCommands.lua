@@ -56,6 +56,40 @@ function Commands:RecipeCheck()
   end
 end
 
+function Commands:RecipeCount()
+  local probe = GTF.BetaProbe
+  if not probe or type(probe.CompareRecipeIDs) ~= "function" then
+    self:Print("recipe count unavailable")
+    return
+  end
+  local ok, result = pcall(probe.CompareRecipeIDs, probe, 10000, true)
+  if not ok then
+    GTF:SetError(result)
+    self:Print("recipe count failed")
+    return
+  end
+  for _, line in ipairs(probe:FormatRecipeCountLines(result)) do
+    self:Print(line)
+  end
+end
+
+function Commands:Scan()
+  local scanner = GTF.ForeverRecipes
+  if not scanner or type(scanner.ScanOpen) ~= "function" then
+    self:Print("manual Forever recipe scan is unavailable")
+    return
+  end
+  local ok, result = pcall(scanner.ScanOpen, scanner)
+  if not ok or not result.success then
+    local message = ok and result.error or tostring(result)
+    GTF:SetError(message)
+    self:Print("recipe scan preserved previous data: " .. tostring(message))
+    return
+  end
+  self:Print("saved " .. tostring(result.learnedCount) .. " learned recipes for "
+    .. tostring(result.profession.name) .. " (" .. tostring(result.count) .. " list entries)")
+end
+
 function Commands:Handle(message)
   local command = tostring(message or ""):lower():match("^%s*(.-)%s*$")
   if command == "" or command == "toggle" or command == "open" then
@@ -74,6 +108,14 @@ function Commands:Handle(message)
     self:RecipeCheck()
     return
   end
+  if command == "recipecount" then
+    self:RecipeCount()
+    return
+  end
+  if command == "scan" then
+    self:Scan()
+    return
+  end
   local minimap = command:match("^minimap%s*(.*)$")
   if minimap then
     minimap = minimap:match("^%s*(.-)%s*$")
@@ -89,7 +131,7 @@ function Commands:Handle(message)
     self:Print("minimap button " .. (button:IsEnabled() and "enabled" or "disabled"))
     return
   end
-  self:Print("usage: /gtf [status|probe|recipecheck|toggle|minimap on|off|toggle] (alias: /act)")
+  self:Print("usage: /gtf [status|probe|recipecheck|recipecount|scan|toggle|minimap on|off|toggle] (alias: /act)")
 end
 
 function Commands:Initialize()

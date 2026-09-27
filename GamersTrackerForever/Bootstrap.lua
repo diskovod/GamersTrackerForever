@@ -171,7 +171,8 @@ function GTF:Initialize()
   if capabilities[self.CAPABILITY.PROFESSION_ENUMERATION] or capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] then
   if self.ProfessionScanner and type(self.ProfessionScanner.Create) == "function" then
     self.Professions = self.ProfessionScanner:Create(_G, self.Api, self.Repository, {
-      rankOnly = capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] ~= true,
+      rankOnly = self.product == self.PRODUCT_FOREVER_BETA
+        or capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] ~= true,
       contextProvider = function()
         return self.Characters and self.Characters.currentContext or self.Api:GetCurrentContext()
       end,
@@ -183,7 +184,8 @@ function GTF:Initialize()
     self.Professions:Initialize(self.Api, self.Repository)
     if self.Characters and self.Characters.SetProfessionScanner then self.Characters:SetProfessionScanner(self.Professions) end
     local professionEvents = { "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "PLAYER_LOGOUT" }
-    if capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] then
+    if capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN]
+      and self.product ~= self.PRODUCT_FOREVER_BETA then
       professionEvents[#professionEvents + 1] = "TRADE_SKILL_SHOW"
       professionEvents[#professionEvents + 1] = "TRADE_SKILL_UPDATE"
       professionEvents[#professionEvents + 1] = "TRADE_SKILL_CLOSE"
@@ -198,6 +200,24 @@ function GTF:Initialize()
       end)
     end
   end
+  end
+  if self.product == self.PRODUCT_FOREVER_BETA
+    and capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN]
+    and self.ForeverRecipeScanner and type(self.ForeverRecipeScanner.Create) == "function" then
+    self.ForeverRecipes = self.ForeverRecipeScanner:Create(_G, self.Api, self.Repository, self.Professions, {
+      onResult = function(result)
+        if type(result) == "table" then self.Runtime.lastProfessionScanAt = result.scannedAt end
+        if self.UI and type(self.UI.Refresh) == "function" then self.UI:Refresh() end
+      end,
+    })
+    for _, event in ipairs({ "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "TRADE_SKILL_CLOSE" }) do
+      local eventName = event
+      self.Dispatcher:On(eventName, function()
+        local ok, result = pcall(self.ForeverRecipes.HandleEvent, self.ForeverRecipes, eventName)
+        if not ok then self:SetError(result); return nil end
+        return result
+      end)
+    end
   end
   if capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] and self.CraftabilityService and type(self.CraftabilityService.Create) == "function" then
     self.Craftability = self.CraftabilityService:Create(self.Repository, { productKey = self.product })

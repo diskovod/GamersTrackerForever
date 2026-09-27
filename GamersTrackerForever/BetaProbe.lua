@@ -488,13 +488,20 @@ end
 -- this reports a few public recipe IDs and names so they can be checked against
 -- the profession window and Wowhead's Forever spell pages. It never persists
 -- the list or changes the client's profession filters.
-function Probe:CompareRecipeIDs()
+function Probe:CompareRecipeIDs(limit, inspectSchematics)
   local env = self.env or _G
   local window = professionWindowState(env)
+  limit = tonumber(limit) or 200
+  if limit < 1 then limit = 200 end
+  if limit > 10000 then limit = 10000 end
   local result = {
-    window = window, available = false, listCount = 0, inspected = 0, limit = 200,
+    window = window, available = false, listCount = 0, inspected = 0, limit = limit,
     learnedTrue = 0, learnedFalse = 0, unknown = 0, idMismatch = 0,
-    professionLookup = false, examples = {}, error = nil,
+    professionLookup = false, learnedByProfession = {}, professionNames = {},
+    duplicateEntries = 0, invalidEntries = 0,
+    schematic = { calls = 0, tables = 0, errors = 0, exactSlots = 0,
+      ambiguousSlots = 0, missingSlotLists = 0, outputIDs = 0, quantityRanges = 0 },
+    examples = {}, error = nil,
   }
   if window ~= "open" then
     result.error = "open a profession window first"
@@ -519,7 +526,11 @@ function Probe:CompareRecipeIDs()
     if result.inspected >= result.limit then break end
     local id = type(value) == "number" and value
       or (value == true and type(key) == "number" and key or nil)
-    if id and id > 0 and id == math.floor(id) and not seen[id] then
+    if id and id > 0 and id == math.floor(id) and seen[id] then
+      result.duplicateEntries = result.duplicateEntries + 1
+    elseif not id or id <= 0 or id ~= math.floor(id) then
+      result.invalidEntries = result.invalidEntries + 1
+    else
       seen[id] = true
       result.inspected = result.inspected + 1
       local infoOK, infoValues = invoke(owner.GetRecipeInfo, id)
@@ -534,6 +545,56 @@ function Probe:CompareRecipeIDs()
         if info.learned then
           result.learnedTrue = result.learnedTrue + 1
           bucket = learnedExamples
+          if result.professionLookup then
+            local lookupOK, lookupValues = invoke(owner.GetProfessionInfoByRecipeID, id)
+            local profession = lookupOK and lookupValues[1] or nil
+            local professionID = type(profession) == "table" and tonumber(profession.professionID) or nil
+            local professionKey = professionID and tostring(professionID) or "unknown"
+            result.learnedByProfession[professionKey] = (result.learnedByProfession[professionKey] or 0) + 1
+            if type(profession) == "table" and type(profession.professionName) == "string"
+              and profession.professionName ~= "" then
+              result.professionNames[professionKey] = profession.professionName:sub(1, 40)
+            end
+          end
+          if inspectSchematics and hasFunction(owner, "GetRecipeSchematic") then
+            local schematicResult = result.schematic
+            schematicResult.calls = schematicResult.calls + 1
+            local schematicOK, schematicValues = invoke(owner.GetRecipeSchematic, id, false)
+            local schematic = schematicOK and schematicValues[1] or nil
+            if type(schematic) ~= "table" then
+              schematicResult.errors = schematicResult.errors + 1
+            else
+              schematicResult.tables = schematicResult.tables + 1
+              if type(schematic.outputItemID) == "number" and schematic.outputItemID > 0 then
+                schematicResult.outputIDs = schematicResult.outputIDs + 1
+              end
+              if type(schematic.quantityMin) == "number" and type(schematic.quantityMax) == "number" then
+                schematicResult.quantityRanges = schematicResult.quantityRanges + 1
+              end
+              if type(schematic.reagentSlotSchematics) ~= "table" then
+                schematicResult.missingSlotLists = schematicResult.missingSlotLists + 1
+              else
+                for _, slot in pairs(schematic.reagentSlotSchematics) do
+                  local reagents = type(slot) == "table" and slot.reagents or nil
+                  local reagentCount, itemCount = 0, 0
+                  if type(reagents) == "table" then
+                    for _, reagent in pairs(reagents) do
+                      reagentCount = reagentCount + 1
+                      if type(reagent) == "table" and type(reagent.itemID) == "number" then
+                        itemCount = itemCount + 1
+                      end
+                    end
+                  end
+                  if type(slot) == "table" and type(slot.quantityRequired) == "number"
+                    and reagentCount == 1 and itemCount == 1 then
+                    schematicResult.exactSlots = schematicResult.exactSlots + 1
+                  else
+                    schematicResult.ambiguousSlots = schematicResult.ambiguousSlots + 1
+                  end
+                end
+              end
+            end
+          end
         else
           result.learnedFalse = result.learnedFalse + 1
           bucket = unlearnedExamples
@@ -563,6 +624,46 @@ function Probe:CompareRecipeIDs()
   return result
 end
 
+function Probe:FormatRecipeCountLines(result)
+  result = result or self:CompareRecipeIDs(10000, true)
+  local lines = { "recipecount is read-only; no recipes are saved" }
+  if not result.available then
+    lines[#lines + 1] = "recipecount " .. tostring(result.error or "unavailable")
+    return lines
+  end
+  local partial = result.listCount > result.limit or result.invalidEntries > 0
+  local countLabel = partial and (">=" .. tostring(result.listCount)) or tostring(result.listCount)
+  lines[#lines + 1] = "all-list " .. countLabel .. " IDs; inspected " .. tostring(result.inspected)
+    .. "; learned " .. tostring(result.learnedTrue) .. ", unlearned " .. tostring(result.learnedFalse)
+    .. ", unknown " .. tostring(result.unknown) .. ", ID mismatches " .. tostring(result.idMismatch)
+  lines[#lines + 1] = "duplicate entries " .. tostring(result.duplicateEntries)
+    .. ", invalid entries " .. tostring(result.invalidEntries)
+  lines[#lines + 1] = partial and "partial scan: learned counts are not a total"
+    or "full returned list scanned; counts are for the current API list"
+  if result.schematic.calls > 0 then
+    lines[#lines + 1] = "learned schematics " .. tostring(result.schematic.tables)
+      .. "/" .. tostring(result.schematic.calls) .. "; errors " .. tostring(result.schematic.errors)
+      .. "; exact/ambiguous slots " .. tostring(result.schematic.exactSlots)
+      .. "/" .. tostring(result.schematic.ambiguousSlots)
+      .. "; missing slot lists " .. tostring(result.schematic.missingSlotLists)
+      .. "; outputs " .. tostring(result.schematic.outputIDs)
+      .. "; ranges " .. tostring(result.schematic.quantityRanges)
+  end
+  if result.professionLookup then
+    local keys = {}
+    for key in pairs(result.learnedByProfession) do keys[#keys + 1] = key end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    for _, key in ipairs(keys) do
+      lines[#lines + 1] = "profession " .. key .. " "
+        .. tostring(result.professionNames[key] or "(name unknown)")
+        .. " learned " .. tostring(result.learnedByProfession[key])
+    end
+  else
+    lines[#lines + 1] = "profession lookup unavailable; per-profession counts unknown"
+  end
+  return lines
+end
+
 function Probe:FormatRecipeComparisonLines(result)
   result = result or self:CompareRecipeIDs()
   local lines = { "recipecheck is read-only; no recipes are saved" }
@@ -578,9 +679,9 @@ function Probe:FormatRecipeComparisonLines(result)
     .. ", unknown " .. tostring(result.unknown)
     .. ", ID mismatches " .. tostring(result.idMismatch)
   if result.listCount > result.limit then
-    lines[#lines + 1] = "partial sample only; counts are not a total and are not limited to the open profession"
+    lines[#lines + 1] = "partial sample only; learned count is not a total for the open profession"
   else
-    lines[#lines + 1] = "all-list counts are not limited to the open profession"
+    lines[#lines + 1] = "full returned list inspected for the open profession"
   end
   lines[#lines + 1] = "profession lookup " .. (result.professionLookup and "available" or "unavailable")
   for _, example in ipairs(result.examples) do

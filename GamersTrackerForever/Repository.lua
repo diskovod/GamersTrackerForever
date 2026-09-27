@@ -100,6 +100,7 @@ local function defaultRecipe()
   return {
     recipeID = 0,
     professionID = 0,
+    professionName = "",
     name = "",
     icon = 0,
     outputItemID = 0,
@@ -299,6 +300,7 @@ local function normalizeRecipe(value, diagnostics, path)
   return {
     recipeID = numberOr(value.recipeID, 0),
     professionID = numberOr(value.professionID, 0),
+    professionName = stringOr(value.professionName, ""),
     name = stringOr(value.name, ""),
     icon = numberOr(value.icon, 0),
     outputItemID = numberOr(value.outputItemID, 0),

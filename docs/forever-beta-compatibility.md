@@ -5,11 +5,11 @@ Scope: installed beta client, user-supplied `/gtf status` and `/gtf probe` outpu
 
 ## Executive result
 
-The installed client is `wow_classic_beta`; its executable is now build `1.60.1.70009`. In-game probes reported interface `16001` and project `1` on this build. A separate `forever_beta` adapter saves character level, profession ranks, and bag snapshots when that interface/project shape is present. The addon declares interfaces `11509, 16001`. The native UI was seen in game; layout and interaction changes still need visual retesting.
+The installed client is `wow_classic_beta`; its executable is build `1.60.1.70009`. In-game probes reported interface `16001` and project `1` on this build. A separate `forever_beta` adapter saves character level, profession ranks, bag snapshots, and verified learned recipes. The addon declares interfaces `11509, 16001`. The native two-pane UI, recipe materials, and character holdings panel were seen in game.
 
 The user's in-game probe found `C_Container` with 44/44 readable bag slots and 129 items, plus four readable profession entries. It found no legacy trade-skill line/count APIs and no accessible bank. The previous no-addon crash report predates this runtime probe; its graphics assertion is not evidence of an addon Lua failure.
 
-The addon uses native WoW frames, not HTML. The beta screenshot showed the split window and `Track up to` selector. The new tree puts professions and captured recipes under the selected character; selecting a recipe opens material cards and a separate per-character holdings panel on the right. Beta recipe rows remain unavailable until recipe scanning passes the compatibility gate.
+The addon uses native WoW frames, not HTML. The split window and `Track up to` selector put professions and captured recipes under the selected character. Selecting a recipe opens material cards and a separate per-character holdings panel. Blacksmithing and Cooking capture passed the compatibility gate on build 70009.
 
 ## Primary client evidence
 
@@ -50,23 +50,23 @@ The user confirmed the Forever beta character's full name is `Disko Lebowski`; t
 
 The Forever adapter enables the proven `C_Container.GetContainerNumSlots/GetContainerItemInfo` bag branch and refuses bank scanning because the beta probe found bank access unavailable. A before/after `/gtf status` around `/reload` showed bag scan timestamps advancing; the beta SavedVariables file then contained the `forever_beta` character record and `inventory.bagsScannedAt`. This confirms bag persistence.
 
-### Profession ranks enabled; recipes disabled
+### Profession ranks and validated learned recipes enabled
 
 The probe found `GetProfessions`/`GetProfessionInfo` readable, while legacy skill-line and trade-skill recipe APIs are absent. The Forever adapter saves profession names and current/max ranks from those readable enumeration calls under `products.forever_beta`. On build 70009, the open-window probe found filtered and all-recipe ID lists, but `GetTradeSkillLineInfo` and `GetRecipesForSkillLine` failed. List presence does not establish that a list is the learned-recipe set.
 
-The read-only compatibility probe now samples at most three numeric recipe IDs from those lists and calls available `GetRecipeInfo` and `GetRecipeSchematic(recipeID, false)` functions. It retains only aggregate calls/errors/table counts, learned-known/true/false counts, numeric output/quantity-range availability, and reagent-slot quantity/exact-item/ambiguous counts (up to 100 slots per sample). It discards IDs, names, links, and raw reagent values. This is diagnostic evidence only. Recipe scanning remains disabled, the Recipes tab stays hidden, and the beta scanner remains rank-only. Enabling persistence requires evidence that the learned boolean is available and correctly distinguishes known from unknown recipes, recipe/output identity can be read safely, reagent slots are complete, and the list used for reconciliation covers all learned recipes rather than only the current filter. Capture results for multiple professions and known learned/unlearned examples before making that decision.
+The read-only probe and `/gtf recipecount` established that `GetAllRecipeIDs` returns a profession-scoped list independent of the search filter, `GetRecipeInfo.learned` distinguishes known examples, and tested learned schematics provide exact reagent IDs and quantities. Blacksmithing returned 507 entries (506 unique, one duplicate), 22 learned and 484 unlearned; Cooking returned 132 unique IDs and 4 learned. The Forever scanner validates the full list, profession mapping, and each learned schematic before atomically replacing one profession's learned set. It runs after the profession window settles; `/gtf scan` is a manual fallback. Failed scans preserve the previous snapshot. Live tests saved 22 Blacksmithing plus 4 Cooking recipes; `/gtf status` reported 26 cached recipes before and after `/reload`. Blacksmithing materials/holdings appeared in the native UI. Other professions and future beta builds remain unverified. The addon does not query Wowhead at runtime.
 
 ### Events and UI templates — likely compatible, runtime required
 
 The dispatcher creates a native `Frame`, registers the addon's event list, and installs an `OnEvent` script (`EventDispatcher.lua:35-55`). The UI uses native `CreateFrame`, `BackdropTemplate` with a fallback, `UIPanelButtonTemplate`, `InputBoxTemplate`, `UIPanelScrollFrameTemplate`, and `UIDropDownMenuTemplate` (`UI.lua:74-96,121-180`). There is no HTML widget or browser/HTML markup in the addon source; `rg` finds no HTML/browser usage under the addon directory. The beta client does contain a `UTILS\BlizzardBrowser.exe`, but no local evidence shows that WoW addon Lua can embed it. Treat “HTML UI inside the addon” as unsupported/unverified; use native frames for the in-game panel.
 
-The UI creates a 250 px left pane with the `Track up to` selector, scrollable characters, expandable professions, and nested recipe choices. The larger right pane shows an overview until a recipe is selected, then material icons/counts above a distinct holdings panel. Saved bag items are no longer rendered as a raw item-ID list. Beta runtime visual verification is still needed for the changed layout.
+The UI creates a 250 px left pane with the `Track up to` selector, scrollable characters, expandable professions, and nested recipe choices. The larger right pane shows an overview until a recipe is selected, then material icons/counts above a distinct holdings panel. Saved bag items are no longer rendered as a raw item-ID list. A Blacksmithing recipe and its material/holdings view were verified live; resizing and multi-character layout remain to be tested.
 
 ## Where bag data is saved
 
 The TOC declares account-level SavedVariables `GamersTrackerForeverDB AltCraftTrackerDB` (`GamersTrackerForever.toc:1-8`). On initialization, `Bootstrap.lua:108-116` passes `GamersTrackerForeverDB` into the repository. The repository recovers/migrates `AltCraftTrackerDB` if needed and then assigns the active table back to `GamersTrackerForeverDB` (`Repository.lua:558-616`). Bag and bank snapshots are stored under each character's `inventory.bags`, `inventory.bank`, and corresponding timestamps (`Repository.lua:899-930`); defaults are defined at `:128-134`.
 
-Therefore the expected on-disk location, after a successful logout/reload, is the beta client's account-wide path `...\_classic_beta_\WTF\Account\<account>\SavedVariables\GamersTrackerForever.lua`. It does not use realm/character subdirectories because the TOC declares `SavedVariables`, not `SavedVariablesPerCharacter`. No such file existed in the inspected beta profile because the addon had not yet been installed/loaded. A future server can consume exported/serialized snapshots, but the current in-game SavedVariables table is the only persistence path; there is no network upload code in the inspected addon source.
+The on-disk location after a successful logout/reload is the beta client's account-wide path `...\_classic_beta_\WTF\Account\<account>\SavedVariables\GamersTrackerForever.lua`. It does not use realm/character subdirectories because the TOC declares `SavedVariables`, not `SavedVariablesPerCharacter`. The live beta profile's file was inspected after `/reload`: it contained the Forever character, bag snapshot, and 22 Blacksmithing recipe definitions/learned flags. A future server can consume exported snapshots, but there is no in-addon network upload code.
 
 ## Explicit release-gate checklist
 
@@ -78,11 +78,11 @@ Therefore the expected on-disk location, after a successful logout/reload, is th
 - [x] Confirm `C_Container` on build `69913` with 44/44 readable slots and 129 counted items; compare those totals against live bags after deploying this build.
 - [x] Confirm `/reload` bag persistence: the bag timestamp advanced and the Forever partition was written.
 - [ ] Open and close a bank, verify `BANKFRAME_OPENED` and `BANKFRAME_CLOSED`, and ensure the bank snapshot is not overwritten with an empty inaccessible cache.
-- [ ] After installing the bounded detail probe, open each profession and capture aggregate detail results; confirm learned true/false on known examples and reagent/output completeness before considering persistence.
-- [ ] Logout normally, inspect the generated `GamersTrackerForever.lua`, reload, and verify the same bag/character data is restored.
+- [x] Capture aggregate recipe details and learned true/false examples for Blacksmithing and Cooking; verify 22 and 4 learned recipes respectively.
+- [x] Inspect the generated `GamersTrackerForever.lua` after `/reload` and verify the Blacksmithing recipe snapshot remains available; the combined 26-recipe count also survived a second `/reload`. Other professions still need persistence regression checks.
 - [ ] Repeat with an Era client/profile to ensure product keys keep beta and Era records separate.
 - [ ] Re-test with the beta GPU crash conditions isolated; do not classify engine/GPU assertions as addon failures unless the addon is loaded and appears in the error report.
 
 ## Recommended next implementation decision
 
-Keep the native two-pane UI and SavedVariables architecture. The partial beta adapter and product partition are in place; the remaining gates are in-client UI/persistence checks and a verified recipe/bank API path. A server can later consume an explicit export of `GamersTrackerForeverDB` through a companion uploader.
+Keep the native two-pane UI and SavedVariables architecture. The verified beta recipe path is enabled; remaining gates are other-profession/Classic Era regression tests, multi-character UI checks, and a bank API path. A server can later consume an explicit export of `GamersTrackerForeverDB` through a companion uploader.

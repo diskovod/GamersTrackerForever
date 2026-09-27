@@ -127,7 +127,13 @@ function ForeverBeta:GetCapabilities()
     [GTF.CAPABILITY.CHARACTER_IDENTITY] = hasFunction(env, "UnitName") or hasFunction(env, "UnitFullName"),
     [GTF.CAPABILITY.CHARACTER_LEVEL] = hasFunction(env, "UnitLevel"),
     [GTF.CAPABILITY.PROFESSION_ENUMERATION] = hasFunction(env, "GetProfessions") and hasFunction(env, "GetProfessionInfo"),
-    [GTF.CAPABILITY.LEARNED_RECIPE_SCAN] = false,
+    [GTF.CAPABILITY.LEARNED_RECIPE_SCAN] = hasFunction(env, "GetProfessions")
+      and hasFunction(env, "GetProfessionInfo")
+      and type(env.C_TradeSkillUI) == "table"
+      and hasFunction(env.C_TradeSkillUI, "GetAllRecipeIDs")
+      and hasFunction(env.C_TradeSkillUI, "GetRecipeInfo")
+      and hasFunction(env.C_TradeSkillUI, "GetProfessionInfoByRecipeID")
+      and hasFunction(env.C_TradeSkillUI, "GetRecipeSchematic"),
     [GTF.CAPABILITY.BAG_INVENTORY_SCAN] = bags,
     [GTF.CAPABILITY.BANK_INVENTORY_SCAN] = false,
     [GTF.CAPABILITY.SAVED_VARIABLES] = true,

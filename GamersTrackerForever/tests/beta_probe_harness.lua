@@ -90,7 +90,8 @@ assert(api:GetCurrentContext().key == "Player-99-0001")
 assert(api:GetCurrentContext().level == 60)
 assert(api:GetCapabilities()[GamersTrackerForever.CAPABILITY.BAG_INVENTORY_SCAN])
 assert(api:GetCapabilities()[GamersTrackerForever.CAPABILITY.PROFESSION_ENUMERATION])
-assert(not api:GetCapabilities()[GamersTrackerForever.CAPABILITY.LEARNED_RECIPE_SCAN])
+assert(api:GetCapabilities()[GamersTrackerForever.CAPABILITY.LEARNED_RECIPE_SCAN],
+  "the tested beta exposes all four required modern recipe APIs")
 local originalFullName = UnitFullName
 UnitFullName = function() return "Disko", "Lebowski" end
 local correctedIdentity = api:GetCurrentIdentity()
@@ -188,6 +189,12 @@ end
 assert(learnedExample, "comparison keeps a bounded learned example")
 assert(unlearnedExample, "comparison keeps a bounded unlearned example")
 assert(comparison.examples[1].professionID == 171, "comparison probes profession ownership when available")
+assert(comparison.learnedByProfession["171"] == 2, "learned counts are grouped by profession")
+local detailedCount = probe:CompareRecipeIDs(10000, true)
+assert(detailedCount.professionNames["171"] == "Alchemy"
+  and detailedCount.schematic.tables == 2 and detailedCount.schematic.exactSlots == 2
+  and detailedCount.schematic.ambiguousSlots == 0,
+  "full count checks learned schematics and profession names without saving them")
 local comparisonOutput = table.concat(probe:FormatRecipeComparisonLines(comparison), "\n")
 assert(comparisonOutput:match("recipe 9001") and comparisonOutput:match("recipe 9002")
   and comparisonOutput:match("learned 2, unlearned 2"), "recipecheck prints bounded ID evidence")
@@ -207,8 +214,22 @@ assert(partialComparison.inspected == 200 and partialComparison.listCount == 201
   "large all-list comparison is deliberately capped")
 assert(partialOutput:match("partial") and partialOutput:match("not a total"),
   "a capped comparison must never present its learned count as the character's total")
+local fullComparison = probe:CompareRecipeIDs(10000)
+local fullOutput = table.concat(probe:FormatRecipeCountLines(fullComparison), "\n")
+assert(fullComparison.inspected == 201 and fullComparison.learnedTrue == 8,
+  "an opt-in count must inspect beyond the 200-ID diagnostic sample")
+assert(fullOutput:match("full returned list scanned") and fullOutput:match("learned 8"),
+  "the complete result must be labeled separately from a partial sample")
 C_TradeSkillUI.GetAllRecipeIDs = originalAllIDs
 C_TradeSkillUI.GetRecipeInfo = originalInfoForPartial
+local duplicateIDs = C_TradeSkillUI.GetAllRecipeIDs
+C_TradeSkillUI.GetAllRecipeIDs = function() return { 9001, 9002, 9003, 9004, 9001 } end
+local deduplicated = probe:CompareRecipeIDs(10000, true)
+local deduplicatedOutput = table.concat(probe:FormatRecipeCountLines(deduplicated), "\n")
+assert(deduplicated.inspected == 4 and deduplicated.duplicateEntries == 1
+  and deduplicated.invalidEntries == 0 and deduplicatedOutput:match("full returned list scanned"),
+  "a duplicate list entry must not make a complete unique-ID scan partial")
+C_TradeSkillUI.GetAllRecipeIDs = duplicateIDs
 local allRecipeIDs = C_TradeSkillUI.GetAllRecipeIDs
 C_TradeSkillUI.GetAllRecipeIDs = function() return { [9001] = true, [9002] = true } end
 local keyedComparison = probe:CompareRecipeIDs()
@@ -248,6 +269,9 @@ DEFAULT_CHAT_FRAME = { AddMessage = function(_, message) chatMessages[#chatMessa
 SlashCmdList.GAMERSTRACKERFOREVER("recipecheck")
 assert(table.concat(chatMessages, "\n"):match("learned 2, unlearned 2"),
   "recipecheck slash command prints the read-only comparison")
+SlashCmdList.GAMERSTRACKERFOREVER("recipecount")
+assert(table.concat(chatMessages, "\n"):match("full returned list scanned"),
+  "recipecount slash command prints a full-list diagnostic")
 assert(GamersTrackerForever.product == "forever_beta")
 assert(GamersTrackerForever.Inventory ~= nil and GamersTrackerForever.Characters ~= nil)
 assert(GamersTrackerForever.Professions ~= nil and GamersTrackerForever.Professions.rankOnly)

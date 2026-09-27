@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.6 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.9 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.6.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.9.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -14,7 +14,9 @@
 - `/gtf` opens or toggles the tracker window (`/act` is a compatibility alias).
 - `/gtf status` prints adapter, client/build/interface, current key, scan times, database counts, and diagnostics.
 - `/gtf probe` prints a read-only compatibility report. It does not scan bank contents or enable an unsupported client.
-- `/gtf recipecheck` inspects up to 200 IDs from the all-professions `GetAllRecipeIDs` list while a profession is open and prints at most two learned and two unlearned examples. When the list is larger, its learned count is only a partial sample, not the character's total or the open profession's count. It is read-only and does not save recipes.
+- `/gtf recipecheck` inspects up to 200 IDs from `GetAllRecipeIDs` while a profession is open and prints at most two learned and two unlearned examples. When the list is larger, its learned count is only a partial sample, not the open profession's total. It is read-only and does not save recipes.
+- `/gtf recipecount` is an opt-in, read-only diagnostic that inspects up to 10,000 recipe IDs and reports learned counts by profession ID, duplicate/invalid entries, and schematic material shapes. It labels a capped or incomplete scan as partial; it still does not save recipes. On the tested beta build, the returned list changes with the open profession.
+- `/gtf scan` manually captures the currently open profession's learned recipes on the supported Forever beta client. Opening or updating a profession also starts an automatic capture after the window settles. A failed or incomplete scan preserves the prior snapshot.
 - `/gtf minimap on|off|toggle` controls the optional minimap button (enabled by default); the same subcommands work through `/act`.
 - The key binding is **Toggle GamersTrackerForever**.
 - Use `/reload` after changing the addon files. The addon never forces a reload.
@@ -49,11 +51,12 @@ Material totals distinguish bags from bank, compatible transfer ecosystems from 
 ## Validation status
 
 - Local Classic Era installation metadata was inspected read-only. The installed client exposes interface **11509** in its Vanilla addon TOCs.
-- All eight fixture harnesses and the SoD static regression check pass. Complete
+- The SoD static regression check passes. Complete
   in-client validation still requires the checklist in
   `tests\classic-era-acceptance-checklist.md`.
-- The Forever beta adapter is limited to character level, profession names and
-  ranks, bag snapshots, native UI, and `/gtf probe`. Beta recipes, bank scans,
-  and cross-character transfer calculations remain disabled. Test `/gtf probe`
-  once with professions closed and again with a profession open; see
-  `docs\forever-beta-probe.md` for the expected diagnostic lines.
+- On Forever beta build 70009, live Blacksmithing and Cooking scans saved 22
+  and 4 learned recipes respectively; `/gtf status` reported 26 cached recipes.
+  Both profession snapshots survived `/reload` and Blacksmithing materials/holdings
+  appeared in the native UI. Bank scanning and transfer-group calculations
+  remain unavailable on this beta client. Other professions and Classic Era
+  still need in-client recipe regression testing.

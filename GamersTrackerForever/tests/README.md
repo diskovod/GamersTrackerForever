@@ -42,6 +42,12 @@ read-only. The harness checks Forever's first/last name interpretation while
 preserving GUID identity, and that open-window modern detail sampling is capped
 at three recipes and reports only aggregate learned/output/reagent shape facts.
 
+`forever_recipe_harness.lua` covers the build-70009 profession-scoped recipe
+path: duplicate IDs, learned/unlearned separation, exact materials, atomic
+reconciliation, and preservation of the previous snapshot when a list or
+schematic is incomplete. Run from the addon directory with
+`lua tests/forever_recipe_harness.lua` when a Lua 5.1 interpreter is available.
+
 ## Task 2 repository harness
 
 `repository_harness.lua` exercises version-1 defaults, context-keyed product and character records, complete atomic snapshot commits, bank preservation when inaccessible, migrations, and valid/missing/corrupt fixture recovery.
