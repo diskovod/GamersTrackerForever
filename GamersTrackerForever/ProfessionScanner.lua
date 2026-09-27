@@ -411,7 +411,7 @@ function Scanner:_normalizeRecipe(profession, index, row, scanAt)
   end
   rawReagents, reagentErr = api:GetTradeSkillReagents(index)
   if rawReagents == nil then return nil, reagentErr or "reagent data unavailable" end
-  local reagentByID = {}
+  local reagentByID, reagentDetails = {}, {}
   for _, reagent in ipairs(rawReagents) do
     local quantity = tonumber(reagent.quantity) or 0
     if quantity < 0 then return nil, "reagent quantity is invalid" end
@@ -419,11 +419,20 @@ function Scanner:_normalizeRecipe(profession, index, row, scanAt)
       local itemID = positive(reagent.itemID)
       if not itemID then return nil, "reagent item link is unavailable" end
       reagentByID[itemID] = (reagentByID[itemID] or 0) + quantity
+      local details = reagentDetails[itemID] or {}
+      if type(reagent.name) == "string" and reagent.name ~= "" then details.name = reagent.name end
+      if type(reagent.link) == "string" and reagent.link ~= "" then details.link = reagent.link end
+      if type(reagent.texture) == "string" or type(reagent.texture) == "number" then details.icon = reagent.texture end
+      reagentDetails[itemID] = details
     end
   end
   local reagents = {}
   for itemID, quantity in pairs(reagentByID) do
-    reagents[#reagents + 1] = { itemID = itemID, quantity = quantity, kind = "item" }
+    local details = reagentDetails[itemID] or {}
+    reagents[#reagents + 1] = {
+      itemID = itemID, quantity = quantity, kind = "item",
+      name = details.name, link = details.link, icon = details.icon,
+    }
   end
   table.sort(reagents, function(a, b) return a.itemID < b.itemID end)
   local icon = type(api.GetTradeSkillIcon) == "function" and api:GetTradeSkillIcon(index) or 0

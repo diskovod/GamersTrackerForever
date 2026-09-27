@@ -575,40 +575,42 @@ end
 
 function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, width, settings)
   local recipe = product.recipes and product.recipes[recipeRow.key]
-  local outputButton = CreateFrame("Button", nil, self.detailContent)
-  outputButton:SetSize(38, 38); outputButton:SetPoint("TOPLEFT", self.detailContent, 8, y)
+  local ok, itemPanel = pcall(CreateFrame, "Frame", nil, self.detailContent, "BackdropTemplate")
+  itemPanel = ok and itemPanel or CreateFrame("Frame", nil, self.detailContent)
+  itemPanel:SetPoint("TOPLEFT", self.detailContent, 8, y)
+  itemPanel:SetWidth(width - 16)
+  createBackdrop(itemPanel)
+  if type(itemPanel.SetBackdropColor) == "function" then
+    itemPanel:SetBackdropColor(0.13, 0.085, 0.055, 0.96)
+  end
+  if type(itemPanel.SetBackdropBorderColor) == "function" then
+    itemPanel:SetBackdropBorderColor(0.43, 0.29, 0.16, 1)
+  end
+  self.detailRows[#self.detailRows + 1] = itemPanel
+
+  local outputButton = CreateFrame("Button", nil, itemPanel)
+  outputButton:SetSize(42, 42); outputButton:SetPoint("TOPLEFT", itemPanel, 14, -14)
   local icon = outputButton:CreateTexture(nil, "ARTWORK")
-  icon:SetSize(38, 38); icon:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
+  icon:SetSize(42, 42); icon:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
   setIcon(icon, recipe and recipe.icon or recipeRow.icon)
   attachItemTooltip(self, outputButton, recipe and recipe.outputItemID, recipe and recipe.outputItemLink)
   self.outputItemButton = outputButton
-  self.detailRows[#self.detailRows + 1] = outputButton
-  local title = label(self.detailContent, "GameFontHighlightLarge", "TOPLEFT", self.detailContent, 52, y,
-    width - 58, 22)
-  title:SetText(recipeRow.name .. wearabilityMarker(self, recipe)); self.detailRows[#self.detailRows + 1] = title
-  local subtitle = label(self.detailContent, "GameFontNormalSmall", "TOPLEFT", self.detailContent, 52, y - 23,
-    width - 58, 18)
-  subtitle:SetText(profession.name .. " " .. tostring(profession.rank) .. "/" .. tostring(profession.maxRank))
-  self.detailRows[#self.detailRows + 1] = subtitle
-  y = y - 50
+  local title = label(itemPanel, "GameFontHighlightLarge", "TOPLEFT", itemPanel, 68, -19,
+    width - 94, 25)
+  title:SetText(recipeRow.name .. wearabilityMarker(self, recipe))
+  self.detailRows[#self.detailRows + 1] = title
+  self.materialCards = {}
   if type(recipe) ~= "table" then
-    local missing = label(self.detailContent, "GameFontDisableSmall", "TOPLEFT", self.detailContent, 8, y, width - 16, 30)
+    local missing = label(itemPanel, "GameFontDisableSmall", "TOPLEFT", itemPanel, 16, -73, width - 48, 30)
     missing:SetText("Recipe details have not been captured yet.")
-    self.detailRows[#self.detailRows + 1] = missing
-    return y - 40
+    itemPanel:SetHeight(112)
+    return y - 126
   end
   local calcOptions = { currentCharacterKey = character.key, transferGroup = character.transferGroup,
     now = now(self.env), settings = settings }
   local calc = GTF.ViewModels.GetRecipeCalculation(self.craftability, recipe, product, calcOptions)
-  local summary = label(self.detailContent, "GameFontNormalSmall", "TOPLEFT", self.detailContent, 8, y, width - 16, 20)
-  summary:SetText("Now: " .. GTF.ViewModels.FormatAvailability(calc and calc.availableNow)
-    .. "  |  After transfer: " .. GTF.ViewModels.FormatAvailability(calc and calc.afterTransfer))
-  self.detailRows[#self.detailRows + 1] = summary
-  y = y - 28
-  local materialTitle = label(self.detailContent, "GameFontHighlight", "TOPLEFT", self.detailContent, 8, y, width - 16, 20)
-  materialTitle:SetText("Materials needed")
-  self.detailRows[#self.detailRows + 1] = materialTitle
-  y = y - 24
+  local materialTitle = label(itemPanel, "GameFontNormalSmall", "TOPLEFT", itemPanel, 16, -70, width - 48, 18)
+  materialTitle:SetText("Reagents:")
   if not calc then
     calc = { reagents = {} }
     for _, reagent in ipairs(recipe.reagents or {}) do
@@ -619,83 +621,130 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
   local materialRows = GTF.ViewModels.BuildMaterialRows(recipe, calc, {
     itemResolver = function(itemID) return resolveItem(self, itemID) end,
   })
-  self.materialCards = {}
   if #materialRows == 0 then
-    local empty = label(self.detailContent, "GameFontDisableSmall", "TOPLEFT", self.detailContent, 8, y, width - 16, 24)
+    local empty = label(itemPanel, "GameFontDisableSmall", "TOPLEFT", itemPanel, 16, -94, width - 48, 24)
     empty:SetText(type(recipe.reagents) == "table" and "No materials required." or "Material details are unavailable.")
-    self.detailRows[#self.detailRows + 1] = empty
-    return y - 30
+    itemPanel:SetHeight(132)
+    return y - 146
   end
-  local columns = width >= 480 and 2 or 1
-  local cardWidth = columns == 2 and math.floor((width - 24) / 2) or width - 16
+  local cardWidth = width - 48
   for index, material in ipairs(materialRows) do
-    local column = (index - 1) % columns
-    local rowIndex = math.floor((index - 1) / columns)
-    local card = CreateFrame("Frame", nil, self.detailContent)
-    card:SetPoint("TOPLEFT", self.detailContent, 8 + column * (cardWidth + 8), y - rowIndex * 55)
-    card:SetSize(cardWidth, 50)
+    local card = CreateFrame("Frame", nil, itemPanel)
+    card:SetPoint("TOPLEFT", itemPanel, 16, -92 - (index - 1) * 46)
+    card:SetSize(cardWidth, 42)
     attachItemTooltip(self, card, material.itemID, material.link, 38)
     local materialIcon = card:CreateTexture(nil, "ARTWORK")
-    materialIcon:SetSize(32, 32); materialIcon:SetPoint("TOPLEFT", card, 2, -5)
+    materialIcon:SetSize(38, 38); materialIcon:SetPoint("TOPLEFT", card, 0, -2)
     setIcon(materialIcon, material.icon)
-    local name = label(card, "GameFontNormalSmall", "TOPLEFT", card, 40, -3, cardWidth - 42, 20)
-    name:SetText(material.name)
-    local count = label(card, "GameFontHighlightSmall", "TOPLEFT", card, 40, -23, cardWidth - 42, 20)
-    count:SetText(tostring(material.nowOwned or 0) .. "/" .. tostring(material.required) .. " in bags · "
-      .. text(material.nowStatus, "unknown"))
-    self.detailRows[#self.detailRows + 1] = card
+    local materialName = text(material.name, "Unknown material")
+    if materialName:match("^Item%s+%d+$") then materialName = "Unknown material" end
+    local caption = label(card, "GameFontHighlightSmall", "LEFT", card, 50, 0, cardWidth - 54, 38)
+    caption:SetText(tostring(material.nowOwned or 0) .. "/" .. tostring(material.required) .. " " .. materialName)
     self.materialCards[#self.materialCards + 1] = card
   end
-  y = y - math.ceil(#materialRows / columns) * 55 - 10
+  itemPanel:SetHeight(104 + #materialRows * 46)
+  y = y - itemPanel:GetHeight() - 14
   local ok, panel = pcall(CreateFrame, "Frame", nil, self.detailContent, "BackdropTemplate")
   panel = ok and panel or CreateFrame("Frame", nil, self.detailContent)
-  panel:SetPoint("TOPLEFT", self.detailContent, 8, y); panel:SetWidth(width - 16)
+  local panelWidth = width - 16
+  panel:SetPoint("TOPLEFT", self.detailContent, 8, y); panel:SetWidth(panelWidth)
   createBackdrop(panel)
   self.detailRows[#self.detailRows + 1] = panel
+  self.sourcePanel = panel
   self.sourceRows = {}
-  local py = -10
-  local heading = label(panel, "GameFontHighlight", "TOPLEFT", panel, 10, py, width - 36, 20)
+  self.sourceCards = {}
+  local py = -12
+  local heading = label(panel, "GameFontHighlight", "TOPLEFT", panel, 12, py, panelWidth - 24, 20)
   heading:SetText("Who has the materials")
-  py = py - 26
+  py = py - 30
+  local holdings, order = {}, {}
   for _, material in ipairs(materialRows) do
-    local materialHeading = label(panel, "GameFontNormalSmall", "TOPLEFT", panel, 10, py, width - 36, 18)
-    materialHeading:SetText(material.name .. " · need " .. tostring(material.required))
-    py = py - 19
-    if #(material.characters or {}) == 0 then
-      local unavailable = label(panel, "GameFontDisableSmall", "TOPLEFT", panel, 20, py, width - 46, 17)
-      unavailable:SetText("Character holdings unavailable")
-      py = py - 19
-    else
-      for _, characterRow in ipairs(material.characters) do
-        local row = CreateFrame("Button", nil, panel)
-        row:SetPoint("TOPLEFT", panel, 20, py); row:SetSize(width - 46, 18)
-        local bags, bagsMeta = GTF.ViewModels.FormatMaterialCell(characterRow, "bags", self.env)
-        local bank, bankMeta = GTF.ViewModels.FormatMaterialCell(characterRow, "bank", self.env)
-        local caption = label(row, "GameFontDisableSmall", "LEFT", row, 0, 0, width - 46, 18)
-        caption:SetText(text(characterRow.displayName, characterRow.characterKey) .. ": " .. bags .. ", " .. bank
-          .. (characterRow.included and "" or " · not pooled"))
-        row:SetScript("OnEnter", function()
-          if GameTooltip and GameTooltip.SetOwner then
-            GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(text(characterRow.displayName, characterRow.characterKey))
-            GameTooltip:AddLine(bagsMeta.tooltip or text(bags))
-            GameTooltip:AddLine(bankMeta.tooltip or text(bank))
-            GameTooltip:Show()
-          end
-        end)
-        row:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
-        self.sourceRows[#self.sourceRows + 1] = row
-        py = py - 19
+    for _, characterRow in ipairs(material.characters or {}) do
+      -- Unknown snapshots contribute nothing visible. A character appears only
+      -- when at least one location has a known, positive material count.
+      local bagsKnown = characterRow.bagsSnapshot and characterRow.bagsSnapshot.known
+      local bankKnown = characterRow.bankSnapshot and characterRow.bankSnapshot.known
+      local owned = (bagsKnown and (tonumber(characterRow.bags) or 0) or 0)
+        + (bankKnown and (tonumber(characterRow.bank) or 0) or 0)
+      if owned > 0 then
+        local key = tostring(characterRow.characterKey or characterRow.displayName)
+        local group = holdings[key]
+        if not group then
+          group = { key = key, name = text(characterRow.displayName, key), materials = {} }
+          holdings[key] = group
+          order[#order + 1] = group
+        end
+        group.materials[#group.materials + 1] = {
+          material = material, character = characterRow, owned = owned,
+        }
       end
     end
-    py = py - 7
   end
-  panel:SetHeight(math.max(54, -py + 8))
+  if #order == 0 then
+    local empty = label(panel, "GameFontDisableSmall", "TOPLEFT", panel, 14, py, panelWidth - 28, 20)
+    empty:SetText("No saved character has these materials.")
+    py = py - 28
+  end
+  local cellWidth = 90
+  local columns = math.max(1, math.floor((panelWidth - 36) / cellWidth))
+  for _, group in ipairs(order) do
+    local lines = math.ceil(#group.materials / columns)
+    local cardHeight = 36 + lines * 29
+    local card = CreateFrame("Frame", nil, panel)
+    card:SetPoint("TOPLEFT", panel, 12, py)
+    card:SetSize(panelWidth - 24, cardHeight)
+    createBackdrop(card)
+    if type(card.SetBackdropColor) == "function" then card:SetBackdropColor(0.12, 0.08, 0.05, 0.96) end
+    card.gtfCharacterKey = group.key
+    self.sourceCards[#self.sourceCards + 1] = card
+    local nickname = label(card, "GameFontNormal", "TOPLEFT", card, 10, -7, panelWidth - 44, 20)
+    nickname:SetText(group.name)
+    for index, entry in ipairs(group.materials) do
+      local column = (index - 1) % columns
+      local line = math.floor((index - 1) / columns)
+      local row = CreateFrame("Button", nil, card)
+      row:SetPoint("TOPLEFT", card, 10 + column * cellWidth, -32 - line * 29)
+      row:SetSize(cellWidth - 6, 24)
+      row.gtfCharacterKey = group.key
+      row.gtfItemID = entry.material.itemID
+      row.gtfOwned = entry.owned
+      local itemButton = CreateFrame("Button", nil, row)
+      itemButton:SetSize(22, 22); itemButton:SetPoint("TOPLEFT", row, 0, -1)
+      local icon = itemButton:CreateTexture(nil, "ARTWORK")
+      icon:SetSize(22, 22); icon:SetPoint("CENTER", itemButton, "CENTER", 0, 0)
+      setIcon(icon, entry.material.icon)
+      attachItemTooltip(self, itemButton, entry.material.itemID, entry.material.link)
+      row.gtfItemButton = itemButton
+      local count = label(row, "GameFontHighlightSmall", "LEFT", row, 28, 0, cellWidth - 34, 20)
+      count:SetText("[" .. tostring(entry.owned) .. "]")
+      row:SetScript("OnEnter", function()
+        local tooltip = self.env and self.env.GameTooltip or GameTooltip
+        if not tooltip or type(tooltip.SetOwner) ~= "function" then return end
+        tooltip:SetOwner(row, "ANCHOR_RIGHT")
+        if type(tooltip.AddLine) == "function" then
+          local bags, bagsMeta = GTF.ViewModels.FormatMaterialCell(entry.character, "bags", self.env)
+          local bank, bankMeta = GTF.ViewModels.FormatMaterialCell(entry.character, "bank", self.env)
+          tooltip:AddLine(group.name .. " — " .. entry.material.name)
+          tooltip:AddLine(bagsMeta.tooltip or text(bags))
+          tooltip:AddLine(bankMeta.tooltip or text(bank))
+        end
+        if type(tooltip.Show) == "function" then tooltip:Show() end
+      end)
+      row:SetScript("OnLeave", function()
+        local tooltip = self.env and self.env.GameTooltip or GameTooltip
+        if tooltip and type(tooltip.Hide) == "function" then tooltip:Hide() end
+      end)
+      self.sourceRows[#self.sourceRows + 1] = row
+    end
+    py = py - cardHeight - 8
+  end
+  panel:SetHeight(math.max(62, -py + 4))
   return y - panel:GetHeight() - 10
 end
 
 function UI:RefreshDetail(productKey, product, characterKey)
-  hideRows(self.detailRows); self.detailRows = {}; self.materialCards = {}; self.sourceRows = {}; self.outputItemButton = nil
+  hideRows(self.detailRows); self.detailRows = {}; self.materialCards = {}; self.sourceRows = {}
+  self.sourceCards = {}; self.sourcePanel = nil; self.outputItemButton = nil
   local settings = self.repository and self.repository.db and self.repository.db.settings or {}
   local model = GTF.ViewModels.BuildCharacterDetail(product, characterKey, {
     now = now(self.env), settings = settings, includeInventoryRows = false,
@@ -718,16 +767,6 @@ function UI:RefreshDetail(productKey, product, characterKey)
     self.detailContent:SetHeight(80)
     return
   end
-  local classLabel = model.className and model.className ~= "" and (" " .. model.className) or ""
-  add(model.name .. " — level " .. tostring(model.level) .. classLabel, "GameFontHighlightLarge")
-  add(text(model.realm, "Realm unknown") .. " | " .. text(model.faction, "Faction unknown"))
-  add("Last seen: " .. GTF.ViewModels.FormatTimestamp(model.lastSeenAt, self.env) .. " | Bags: "
-    .. model.bagsFreshness.label .. " | Bank: " .. model.bankFreshness.label, "GameFontNormalSmall")
-  local forget = button(self.detailContent, "Forget", 70, 22)
-  forget:SetPoint("TOPLEFT", 8, y - 2)
-  forget:SetScript("OnClick", function() self:ConfirmForget(productKey, model.key, model.name) end)
-  self.detailRows[#self.detailRows + 1] = forget
-  y = y - 35
   local selectedProfession, selectedRecipe
   for _, profession in ipairs(model.professions or {}) do
     if tostring(profession.key) == tostring(self.selectedProfessionKey) then
@@ -752,10 +791,16 @@ function UI:RefreshDetail(productKey, product, characterKey)
       add("Choose a recipe under this profession on the left.", "GameFontNormalSmall")
     end
   else
+    local classLabel = model.className and model.className ~= "" and (" " .. model.className) or ""
+    add(model.name .. " — level " .. tostring(model.level) .. classLabel, "GameFontHighlightLarge")
+    add(text(model.realm, "Realm unknown") .. " | " .. text(model.faction, "Faction unknown"))
+    add("Last seen: " .. GTF.ViewModels.FormatTimestamp(model.lastSeenAt, self.env) .. " | Bags: "
+      .. model.bagsFreshness.label .. " | Bank: " .. model.bankFreshness.label, "GameFontNormalSmall")
+    y = y - 12
     add("Select a profession on the left to browse its recipes.", "GameFontNormalSmall")
     add("Bag snapshots are saved and shown when a recipe needs their materials.", "GameFontDisableSmall")
   end
-  if self.statusMessage then add(self.statusMessage, "GameFontHighlight") end
+  if self.statusMessage and not selectedRecipe then add(self.statusMessage, "GameFontHighlight") end
   self.detailContent:SetHeight(math.max(120, -y + 20))
 end
 
@@ -824,7 +869,7 @@ function UI:RefreshRecipes(productKey, product)
         local materialLine = label(detail, "GameFontNormalSmall", "TOPLEFT", detail, 0, my, math.max(1, detailWidth - 10), 18)
         local nowShortage = material.nowShortage ~= nil and (" short " .. tostring(material.nowShortage)) or ""
         local transferShortage = material.afterTransferShortage ~= nil and (" short " .. tostring(material.afterTransferShortage)) or ""
-        materialLine:SetText(text(material.name, "Item " .. tostring(material.itemID)) .. "  need " .. tostring(material.required)
+        materialLine:SetText(text(material.name, "Unknown material") .. "  need " .. tostring(material.required)
           .. " | now " .. tostring(material.nowOwned or 0) .. " bags, " .. text(material.nowStatus, "unknown") .. nowShortage
           .. " | after transfer " .. tostring(material.afterTransferOwned or 0) .. ", " .. text(material.afterTransferStatus, "unknown") .. transferShortage)
         my = my - 17

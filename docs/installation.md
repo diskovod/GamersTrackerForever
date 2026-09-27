@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.14 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.15 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.14.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.15.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -24,17 +24,21 @@
   is no tracking limit or separate Characters tab. The left pane has a search
   field and a Character → Profession → Category → Recipe tree styled like the
   native profession list, with framed category bars and white recipe names.
-  Expand a character and profession to browse captured recipes, then select a recipe to
-  see material icons and quantities on the right. Categories appear when the
+  Expand a character and profession to browse captured recipes, then select a
+  recipe to see a framed item-and-reagents block on the right. A separate
+  character-grouped block shows only positive material holdings as icons and
+  counts. Selecting the character row shows its identity and scan freshness;
+  those details do not repeat on the recipe page. Categories appear when the
   client exposes them; otherwise recipes are grouped as Uncategorized. The
-  All Recipes button opens the cross-character recipe view. A separate panel
-  below shows each character's last-known bag/bank holdings.
+  All Recipes button opens the cross-character recipe view.
   Hover a recipe row, crafted item icon, or material card for the native item
   tooltip. An equipped-item comparison appears when the client provides it.
   A small class icon identifies each character. A red X marks equipment the
   currently logged-in character cannot wear when the item type is known;
-  unknown or uncached items are not marked. Forget is available on a selected
-  character, but logging that character in again will add it back.
+  unknown or uncached items are not marked. The main UI has no Forget button.
+  If a material name is not cached or saved from a profession scan, it appears
+  as “Unknown material,” not a numeric item ID; reopening the profession can
+  populate its name when the client provides it.
 
 ## Data and freshness
 

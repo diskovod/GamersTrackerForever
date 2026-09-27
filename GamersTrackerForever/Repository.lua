@@ -237,6 +237,11 @@ local function normalizeReagents(value, diagnostics, path)
         quantity = numberOr(reagent.quantity, 0),
         kind = stringOr(reagent.kind, "item"),
       }
+      -- Cache only names and links observed from the client. Recipe display
+      -- can still identify reagents after GetItemInfo's local cache is empty.
+      if type(reagent.name) == "string" and reagent.name ~= "" then normalized.name = reagent.name end
+      if type(reagent.link) == "string" and reagent.link ~= "" then normalized.link = reagent.link end
+      if type(reagent.icon) == "string" or type(reagent.icon) == "number" then normalized.icon = reagent.icon end
       local booleanFlags = { "soulbound", "currency", "tool", "locationBound", "substitutable" }
       for _, flag in ipairs(booleanFlags) do
         if reagent[flag] ~= nil then

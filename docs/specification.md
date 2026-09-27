@@ -1,8 +1,8 @@
 # GamersTrackerForever — Addon Specification
 
-**Version:** 1.2 (profession-list styling revision)
+**Version:** 1.3 (selected-item presentation revision)
 
-**Status:** Implemented in 0.3.0-beta.14; client acceptance remains partial
+**Status:** Implemented in 0.3.0-beta.15; client acceptance remains partial
 
 **Updated:** 2026-09-27
 
@@ -133,9 +133,9 @@ The record shall contain:
 
 Every valid previously saved character shall remain visible, including records
 that an older release marked untracked. Migration shall not erase their
-profession, recipe, or inventory snapshots. There is no count cap. The UI may
-offer an explicitly confirmed **Forget** operation for an obsolete local
-record; logging back into that character discovers it again.
+profession, recipe, or inventory snapshots. There is no count cap. The main UI
+does not offer character deletion; an internal, scoped cleanup API may remain
+for maintenance.
 
 The addon shall not claim to enumerate characters that have never loaded it. Manual empty placeholders are not part of MVP.
 
@@ -245,28 +245,24 @@ Wowhead is not an MVP dependency. A future separately approved build-time catalo
 
 ### FR-7: Material availability
 
-Clicking a recipe shall open a material panel.
+Clicking a recipe shall open the framed item/reagent block and its separate
+positive-holdings subpanel. For each reagent, the main view shows an icon,
+localized name, and owned/required quantity. The holdings subpanel shows only
+characters with a positive known amount of at least one reagent, grouped by
+nickname with small reagent icons and counts. Raw IDs, zero-quantity rows,
+and status prose are not displayed in this default selected-item view.
 
-For every reagent, show:
-
-- item icon and localized name;
-- quantity required per craft;
-- current-character bag quantity;
-- each included character's bag quantity;
-- each included character's last-known bank quantity;
-- pooled compatible total;
-- shortage;
-- snapshot age;
-- status: `ready`, `short`, `stale`, `unknown`, or `special requirement`.
-
-Every discovered character shall be represented, including zero values and characters with missing scans.
+The calculation model still retains each character's bag and bank quantities,
+pooled compatible total, shortage, scan age, and `ready`/`short`/`stale`/
+`unknown`/`special requirement` status. Per-location provenance and freshness
+may be shown on hover or in diagnostics without cluttering the item page.
 
 Hovering the crafted-item icon, recipe row, or reagent card shall use the
 client's native item tooltip positioned beside the hovered item. Equipped-item
 comparison may appear when the client supports it. A missing item cache must
 not fabricate tooltip data.
 
-The panel shall distinguish:
+The underlying calculation shall distinguish:
 
 1. **Available now:** materials immediately usable by the current character.
 2. **Available after transfer:** pooled materials belonging to compatible included characters.
@@ -499,11 +495,11 @@ Search [Copper                       ×]
 Search is case-insensitive across character, profession, category, and recipe
 names. When a descendant matches, its ancestors stay visible and expand for
 the filtered view without destroying the prior expansion state. Clearing the
-query restores the previous tree. Selecting a recipe shows its output item,
-profession, materials, craftability summary, and per-character holdings in
-the right pane. The character overview shows identity, level, freshness, and
-professions, but no raw bag item-ID dump or Track/Untrack button. `Forget`
-remains an explicit, confirmed cleanup action.
+query restores the previous tree. Selecting a recipe replaces the right pane
+with a dedicated item view. Selecting the character row instead shows identity,
+level, freshness, and professions. Character facts do not repeat above a
+selected item. The character overview has no raw bag item-ID dump, manual
+tracking controls, or Forget button.
 
 ### 9.3 All Recipes view
 
@@ -515,19 +511,35 @@ craftability/shortage, and transfer ecosystem where supported.
 
 ### 9.4 Recipe detail, material panel, and item hints
 
-The output item and each material are displayed with an icon and native WoW
-tooltip on hover, positioned beside the hovered item. When available, the
-client's equipped-item comparison is allowed to appear. Hovering a character
-holding shows the location and scan age behind its quantity. The material
-panel remains separate from the item detail:
+The selected recipe uses a visually framed item block resembling the native
+profession detail: output icon and item name at the top, followed by a compact
+reagent list with icons, names, and owned/required quantities. No character
+identity, profession rank, craftability status sentence, or raw item ID appears
+in this item view. If an item name is not cached, display a neutral unknown
+label; keep the ID internally for lookup and tooltip.
+
+Below it, a separate **Who has the materials** subpanel groups holdings by
+character. Include only a character with a positive known quantity for at
+least one required material. Each character block shows the nickname and,
+inside, one small icon and owned count for each material that character has.
+Do not show zero-quantity characters, per-material need totals, bag/bank prose,
+or transfer/craftability calculations in the default subpanel. A tooltip may
+retain per-location quantities and snapshot freshness without cluttering the
+main view.
 
 ```text
-Heavy Copper Maul — known by Brinna
-
-Material       Need   Total   Brinna             Corvin           Status
-Copper Bar       20      24   4 bags             20 bank (2h)     Ready
-Weak Flux         2       —   Vendor/special      —                Buy 2
+┌ Runed Copper Belt
+│ [item icon]
+│ Reagents: [Copper Bar icon] 0/10 Copper Bar
+└
+┌ Who has the materials
+│ Brinna  [Copper Bar icon] 10
+│ Corvin  [Copper Bar icon] 4
+└
 ```
+
+The output item and each material offer a native WoW tooltip beside the
+hovered item. When available, the client's equipped-item comparison may appear.
 
 For an equippable output, show a small red cross by the recipe name **only**
 when item classification and the *currently logged-in* character's class
@@ -575,7 +587,8 @@ Responsibilities:
 - Numeric IDs drive joins; localized names are display-only.
 - Unsupported APIs disable only the affected feature.
 - Scanner failures preserve the last valid snapshot.
-- Every cached value shown to the user exposes freshness.
+- Every cached quantity has freshness metadata available on hover or in
+  diagnostics, even when the compact default view omits status prose.
 - Core calculations are testable outside WoW with Lua fixtures.
 - API adapters are selected through product/capability detection, not folder-name assumptions.
 - Source files remain readable and modular; no generated external catalog is required for MVP.
@@ -590,7 +603,8 @@ Responsibilities:
 - Login as character B preserves and displays character A.
 - Same-named Classic characters on different realms do not collide.
 - Classic and Forever records do not mix.
-- Forgetting a character removes only the selected character's snapshots.
+- The main UI has no Forget button; choosing a character shows only its
+  overview, while choosing a recipe shows only its item detail.
 
 ### Professions and recipes
 
@@ -613,6 +627,9 @@ Responsibilities:
   the currently logged-in character, not the selected recipe crafter.
 - Recipe row, output icon, and reagent icon open native item tooltips beside
   the hovered item; output equipment comparison remains available.
+- No raw item ID, profession rank, character summary, or Now/After transfer
+  summary appears in selected-item detail. The separate holdings block shows
+  only positive owners, grouped by nickname with material icons and counts.
 
 ### Inventory
 
@@ -755,7 +772,8 @@ Deliverables:
 - search and recipe filters;
 - material matrix;
 - freshness states and tooltips;
-- automatic character inclusion and confirmed Forget flow;
+- automatic character inclusion and a scoped cleanup API (not exposed in the
+  current main UI);
 - minimap button and key binding.
 
 Depends on: Tasks 2 and 5 public interfaces.
@@ -809,7 +827,8 @@ Task 8 starts when the beta client exists and the relevant core interfaces are s
 2. **Left search:** place a search-and-clear field above the left tree;
    matching recipe/category descendants reveal their ancestors temporarily.
 3. **Remove Characters button:** the character tree is the default view;
-   remove manual Track/Untrack controls, keep confirmed Forget.
+   remove manual Track/Untrack controls. The earlier confirmed Forget control
+   is superseded by the selected-item revision below.
 4. **Native categories and visual hierarchy:** preserve client-exposed recipe
    categories, add collapsible category rows, and improve left-pane contrast,
    spacing, selection, and scrolling.
@@ -823,6 +842,18 @@ Each task requires a focused fixture test. The integrated build must pass all
 Lua harnesses, load in the Forever beta without a Lua error, survive `/reload`,
 and show the intended tree, category, tooltip, and item badge behavior. Live
 Forever bank and transfer support remain outside this UI revision.
+
+### Selected-item revision (2026-09-27)
+
+1. Present a framed output-and-reagents item block inspired by the native
+   profession detail, without the character header, profession rank, or
+   craftability summary.
+2. Resolve material names when possible and never expose raw item IDs as
+   fallback labels.
+3. Present positive holdings in a separate character-grouped subpanel with
+   material icons and owned quantities; retain detailed provenance on hover.
+4. Show character facts only when selecting the character row, and remove the
+   Forget button from the main UI.
 
 ## 15. Definition of done
 

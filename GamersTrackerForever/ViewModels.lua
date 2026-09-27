@@ -262,12 +262,32 @@ function ViewModels.BuildRecipes(catalog, productKey, query)
   return rows
 end
 
-local function itemInfo(itemID, resolver)
+local function itemLinkName(link)
+  if type(link) ~= "string" then return nil end
+  local name = link:match("|h%[([^%]]+)%]|h")
+  return name and name ~= "" and name or nil
+end
+
+local function knownMaterialName(value)
+  if type(value) ~= "string" or value == "" then return nil end
+  -- Placeholder names from an incomplete item cache are not item names.
+  if value:match("^[Ii]tem%s*#?%s*%d+$") or value:match("^%d+$") then return nil end
+  return value
+end
+
+local function itemInfo(itemID, source, resolver)
+  local name, link, icon
   if type(resolver) == "function" then
-    local ok, name, link, icon = pcall(resolver, itemID)
-    if ok and (name or link or icon) then return text(name, "Item " .. tostring(itemID)), link, icon end
+    local ok, resolvedName, resolvedLink, resolvedIcon = pcall(resolver, itemID)
+    if ok then name, link, icon = resolvedName, resolvedLink, resolvedIcon end
   end
-  return "Item " .. tostring(itemID), nil, nil
+  source = type(source) == "table" and source or {}
+  name = knownMaterialName(name) or knownMaterialName(itemLinkName(link))
+    or knownMaterialName(source.name) or knownMaterialName(itemLinkName(source.link))
+    or "Unknown material"
+  if type(link) ~= "string" or link == "" then link = source.link end
+  if icon == nil then icon = source.icon end
+  return name, link, icon
 end
 
 function ViewModels.BuildMaterialRows(recipe, calculation, options)
@@ -279,8 +299,7 @@ function ViewModels.BuildMaterialRows(recipe, calculation, options)
     local source = reagent.requirement or (recipe.reagents and recipe.reagents[index]) or {}
     local name, link, icon
     if reagent.itemID then
-      name, link, icon = itemInfo(reagent.itemID, options.itemResolver)
-      if name == "Item " .. tostring(reagent.itemID) and source.name then name = source.name end
+      name, link, icon = itemInfo(reagent.itemID, source, options.itemResolver)
     else
       name, icon = text(source.name, "Special requirement"), source.icon
     end

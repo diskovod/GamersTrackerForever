@@ -129,7 +129,8 @@ local mixed = {
   products = {
     healthy = {
       dataVersion = 1,
-      recipes = { good = { recipeID = 7, name = "Good", reagents = { { itemID = 123, quantity = 2 } } } },
+      recipes = { good = { recipeID = 7, name = "Good", reagents = { { itemID = 123, quantity = 2,
+        name = "Known Material", link = "|Hitem:123:0|h[Known Material]|h", icon = 456 } } } },
       characters = { keep = { tracked = true, level = 10, identity = { displayName = "Keep" } } },
     },
     corruptProduct = "not a product",
@@ -140,6 +141,8 @@ local recovered = GamersTrackerForever.Repository:Create({}):Initialize(mixed)
 assert(recovered.schemaVersion == 1 and recovered.settings.veryStaleAfterSeconds == 604800)
 assert(recovered.products.healthy.characters.keep.level == 10)
 assert(recovered.products.healthy.recipes.good.recipeID == 7)
+assert(recovered.products.healthy.recipes.good.reagents[1].name == "Known Material")
+assert(recovered.products.healthy.recipes.good.reagents[1].icon == 456)
 assert(recovered.products.corruptProduct == nil)
 assert(recovered.products.partial.characters.bad == nil)
 assert(recovered.products.partial.characters.okay.level == 12)

@@ -106,25 +106,38 @@ function Scanner:_collect(scanAt)
         if type(info.name) ~= "string" or info.name == "" then
           return nil, "learned recipe name is unavailable"
         end
-        local reagentByID = {}
+        local reagentByID, reagentDetails = {}, {}
         for _, slot in pairs(schematic.reagentSlotSchematics) do
           if type(slot) ~= "table" or not positive(slot.quantityRequired)
             or type(slot.reagents) ~= "table" then
             return nil, "reagent slot is incomplete"
           end
-          local reagentID, choices = nil, 0
+          local reagentID, reagentInfo, choices = nil, nil, 0
           for _, reagent in pairs(slot.reagents) do
             choices = choices + 1
             reagentID = type(reagent) == "table" and positive(reagent.itemID) or nil
+            reagentInfo = reagent
           end
           if choices ~= 1 or not reagentID then
             return nil, "reagent slot is ambiguous or non-item"
           end
           reagentByID[reagentID] = (reagentByID[reagentID] or 0) + slot.quantityRequired
+          if type(reagentInfo) == "table" then
+            local details = reagentDetails[reagentID] or {}
+            local name = reagentInfo.name or reagentInfo.itemName
+            if type(name) == "string" and name ~= "" then details.name = name end
+            if type(reagentInfo.link) == "string" and reagentInfo.link ~= "" then details.link = reagentInfo.link end
+            if type(reagentInfo.icon) == "string" or type(reagentInfo.icon) == "number" then details.icon = reagentInfo.icon end
+            reagentDetails[reagentID] = details
+          end
         end
         local reagents = {}
         for itemID, quantity in pairs(reagentByID) do
-          reagents[#reagents + 1] = { itemID = itemID, quantity = quantity, kind = "item" }
+          local details = reagentDetails[itemID] or {}
+          reagents[#reagents + 1] = {
+            itemID = itemID, quantity = quantity, kind = "item",
+            name = details.name, link = details.link, icon = details.icon,
+          }
         end
         table.sort(reagents, function(a, b) return a.itemID < b.itemID end)
         local recipeKey = "recipe:" .. tostring(id)

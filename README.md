@@ -11,6 +11,9 @@ tree on the left and a larger detail pane on the right. Every character that
 runs the addon is included automatically; there is no tracking cap or manual
 Track/Untrack control. Class icons and conservative current-character
 cannot-wear hints help identify recipes at a glance.
+Selecting a recipe opens a separate framed item-and-reagents view with a compact
+character-grouped holdings block. The main UI does not show raw item IDs or a
+Forget control.
 
 The addon is informational. It does not move items, automate protected actions,
 or contact an external service. The beta probe on build `1.60.1.69913`
@@ -58,6 +61,6 @@ Enable **GamersTrackerForever** on the character-selection AddOns screen, then u
 ## Current validation status
 
 The manifest targets Classic Era/SoD interface `11509` and Forever beta
-interface `16001`. Eleven Lua fixture harnesses and the SoD XML regression
+interface `16001`. Twelve Lua fixture harnesses and the SoD XML regression
 pass locally. Forever beta recipe and bag snapshots have survived `/reload`
 in live testing; full bank/transfer acceptance is still pending.

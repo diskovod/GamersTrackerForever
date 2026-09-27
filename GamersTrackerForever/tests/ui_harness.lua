@@ -185,7 +185,8 @@ assert(not treeContains("[tracked]") and not treeContains("[available]"),
 for _, row in ipairs(ui.detailRows or {}) do
   assert(not tostring(row.text or ""):find("Saved inventory", 1, true)
     and not tostring(row.text or ""):find("Item 100", 1, true), "overview must not dump raw inventory")
-  assert(row.text ~= "Track" and row.text ~= "Untrack", "manual tracking control is removed")
+  assert(row.text ~= "Track" and row.text ~= "Untrack" and row.text ~= "Forget",
+    "manual tracking and Forget controls are removed")
 end
 ui:ToggleProfession("ana", "alchemy")
 assert(ui.expandedProfessions["ana|alchemy"] and ui.selectedProfessionKey == "alchemy",
@@ -223,6 +224,21 @@ assert(treeContains("Test Potion"), "reopening a category restores its recipes")
 ui:SelectRecipe("ana", "alchemy", "recipe:1")
 assert(ui.selectedRecipeKey == "recipe:1" and #ui.materialCards == 1,
   "recipe selection renders a material card")
+assert(ui.sourcePanel and ui.sourcePanel ~= ui.detailRows[1],
+  "item detail and material holders use separate framed panels")
+for _, row in ipairs(ui.detailRows or {}) do
+  local caption = tostring(row.text or "")
+  assert(not caption:find("Ana — level", 1, true)
+    and not caption:find("Last seen:", 1, true)
+    and not caption:find("Now:", 1, true)
+    and caption ~= "Forget", "item page does not repeat character or craftability summary")
+end
+for _, field in ipairs(ui.detailRows[1].fontStrings or {}) do
+  assert(not tostring(field.text or ""):find("Alchemy 225/300", 1, true),
+    "item panel omits profession rank")
+end
+assert(not tostring(ui.materialCards[1].fontStrings[1].text):find("Item 100", 1, true),
+  "material caption shows a name, not a numeric item ID")
 local testSubclass = 3 -- mail armor is permanently unavailable to Priests
 ui.env.UnitClass = function() return "Priest", "PRIEST", 5 end
 ui.env.GetItemInfoInstant = function(itemID)
@@ -269,9 +285,15 @@ for _, row in ipairs(ui.rows or {}) do
 end
 assert(recipeTreeTooltip, "recipe rows also show the crafted item tooltip")
 same(ui.materialCards[1].textures[1].texture, 555, "material card uses the item texture, not item quality")
-same(#ui.sourceRows, 4, "separate holdings panel includes every tracked character")
+same(#ui.sourceCards, 1, "only characters with positive known holdings get cards")
+same(#ui.sourceRows, 1, "zero and unknown holdings do not clutter the subpanel")
+same(ui.sourceRows[1].gtfOwned, 24, "character material amount includes known bags and bank")
+same(ui.sourceRows[1].gtfCharacterKey, "ana", "holding stays grouped under its nickname")
+assert(ui.sourceRows[1].gtfItemButton and type(ui.sourceRows[1].gtfItemButton.scripts.OnEnter) == "function",
+  "holding icon keeps the native item tooltip")
 ui:SelectCharacter("ana")
 assert(ui.selectedRecipeKey == nil, "selecting a character returns to its overview")
+same(#ui.sourceCards, 0, "character overview clears stale item-holder cards")
 ui.tab = "recipes"; ui:Refresh(); assert(ui.recipeScroll and ui.recipeContent, "recipes tab renders")
 ui:SelectCharacter("ana")
 same(ui.tab, "characters", "selecting a character exits the all-recipes view without a Characters tab")
@@ -284,6 +306,22 @@ ui.recipeSearch.scripts.OnTextChanged()
 assert(ui.recipeContent:GetHeight() > 1, "filter edit renders recipes without a nil product")
 ui:RefreshRecipes()
 assert(ui.recipeContent:GetHeight() > 1, "direct recipe refresh resolves product context")
+
+-- Multiple owners and reagents must form character cards, not a matrix of
+-- zero rows or repeated per-material headings.
+product.recipes["recipe:3"] = { recipeID = 3, professionID = 171, name = "Mixed Supplies",
+  outputItemID = 901, reagents = { { itemID = 100, quantity = 1, kind = "item" },
+    { itemID = 200, quantity = 2, kind = "item" } } }
+product.characters.ana.professions.alchemy.learnedRecipes["recipe:3"] = true
+product.characters.corvin.inventory.bags = { [200] = 3 }
+product.characters.corvin.inventory.bagsScannedAt = 1999
+ui:SelectRecipe("ana", "alchemy", "recipe:3")
+same(#ui.sourceCards, 2, "two positive owners render as two nickname cards")
+same(#ui.sourceRows, 2, "each owner shows only the material it actually holds")
+same(ui.sourceRows[1].gtfCharacterKey, "ana", "first owner groups its own material")
+same(ui.sourceRows[1].gtfItemID, 100, "first owner gets correct reagent icon")
+same(ui.sourceRows[2].gtfCharacterKey, "corvin", "second owner groups its own material")
+same(ui.sourceRows[2].gtfItemID, 200, "second owner gets correct reagent icon")
 
 local beta = repo:GetProduct("forever_beta", true)
 beta.characters.beta = { tracked = true, identity = { displayName = "Beta Crafter" }, level = 20,

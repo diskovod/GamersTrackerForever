@@ -28,7 +28,7 @@ local env = {
       assert(isRecraft == false)
       return { outputItemID = id + 1000, quantityMin = 1, quantityMax = 2,
         reagentSlotSchematics = { { quantityRequired = 2, reagents = ambiguous
-          and { { itemID = 118 }, { itemID = 2840 } } or { { itemID = 118 } } } } }
+          and { { itemID = 118 }, { itemID = 2840 } } or { { itemID = 118, name = "Rough Stone", icon = 123 } } } } }
     end,
   },
 }
@@ -59,6 +59,7 @@ assert(product.recipes["recipe:1001"].categoryPath[2] == "Mail Leggings")
 assert(product.recipes["recipe:1002"].categoryName == "Weapon Stones")
 assert(product.recipes["recipe:1001"].reagents[1].itemID == 118)
 assert(product.recipes["recipe:1001"].reagents[1].quantity == 2)
+assert(product.recipes["recipe:1001"].reagents[1].name == "Rough Stone", "schematic name survives persistence")
 assert(product.recipes["recipe:1001"].outputMin == 1)
 assert(product.recipes["recipe:1001"].outputMax == 2)
 

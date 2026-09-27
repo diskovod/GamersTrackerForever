@@ -67,6 +67,7 @@ local product = repo:GetProduct("classic_era", true)
 local character = repo:GetCharacter("classic_era", "Player-1-0001", false)
 assert(product.recipes["recipe:1001"].outputItemID == 2001)
 assert(product.recipes["recipe:1001"].reagents[1].itemID == 3001)
+assert(product.recipes["recipe:1001"].reagents[1].name == "reagent", "scanner preserves trusted reagent names")
 assert(character.professions["profession:164"].learnedRecipes["recipe:1002"])
 assert(character.professions["profession:164"].scanState == "current")
 
