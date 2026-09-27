@@ -39,6 +39,23 @@ function Commands:Probe()
   end
 end
 
+function Commands:RecipeCheck()
+  local probe = GTF.BetaProbe
+  if not probe or type(probe.CompareRecipeIDs) ~= "function" then
+    self:Print("recipe ID comparison is unavailable")
+    return
+  end
+  local ok, result = pcall(probe.CompareRecipeIDs, probe)
+  if not ok then
+    GTF:SetError(result)
+    self:Print("recipe ID comparison failed")
+    return
+  end
+  for _, line in ipairs(probe:FormatRecipeComparisonLines(result)) do
+    self:Print(line)
+  end
+end
+
 function Commands:Handle(message)
   local command = tostring(message or ""):lower():match("^%s*(.-)%s*$")
   if command == "" or command == "toggle" or command == "open" then
@@ -51,6 +68,10 @@ function Commands:Handle(message)
   end
   if command == "probe" then
     self:Probe()
+    return
+  end
+  if command == "recipecheck" then
+    self:RecipeCheck()
     return
   end
   local minimap = command:match("^minimap%s*(.*)$")
@@ -68,7 +89,7 @@ function Commands:Handle(message)
     self:Print("minimap button " .. (button:IsEnabled() and "enabled" or "disabled"))
     return
   end
-  self:Print("usage: /gtf [status|probe|toggle|minimap on|off|toggle] (alias: /act)")
+  self:Print("usage: /gtf [status|probe|recipecheck|toggle|minimap on|off|toggle] (alias: /act)")
 end
 
 function Commands:Initialize()

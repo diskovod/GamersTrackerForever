@@ -484,6 +484,111 @@ function Probe:ReadModernTradeSkills()
   return result
 end
 
+-- Opt-in ID comparison for /gtf recipecheck. Unlike the aggregate /gtf probe,
+-- this reports a few public recipe IDs and names so they can be checked against
+-- the profession window and Wowhead's Forever spell pages. It never persists
+-- the list or changes the client's profession filters.
+function Probe:CompareRecipeIDs()
+  local env = self.env or _G
+  local window = professionWindowState(env)
+  local result = {
+    window = window, available = false, listCount = 0, inspected = 0, limit = 200,
+    learnedTrue = 0, learnedFalse = 0, unknown = 0, idMismatch = 0,
+    professionLookup = false, examples = {}, error = nil,
+  }
+  if window ~= "open" then
+    result.error = "open a profession window first"
+    return result
+  end
+  local owner = env.C_TradeSkillUI
+  if not hasFunction(owner, "GetAllRecipeIDs") or not hasFunction(owner, "GetRecipeInfo") then
+    result.error = "all-recipe ID or recipe-info API is unavailable"
+    return result
+  end
+  local listOK, listValues = invoke(owner.GetAllRecipeIDs)
+  local ids = listValues[1]
+  if not listOK or type(ids) ~= "table" then
+    result.error = "all-recipe ID list is unreadable"
+    return result
+  end
+  result.available = true
+  result.listCount = boundedTableCount(ids, result.limit + 1)
+  result.professionLookup = hasFunction(owner, "GetProfessionInfoByRecipeID")
+  local learnedExamples, unlearnedExamples, seen = {}, {}, {}
+  for key, value in pairs(ids) do
+    if result.inspected >= result.limit then break end
+    local id = type(value) == "number" and value
+      or (value == true and type(key) == "number" and key or nil)
+    if id and id > 0 and id == math.floor(id) and not seen[id] then
+      seen[id] = true
+      result.inspected = result.inspected + 1
+      local infoOK, infoValues = invoke(owner.GetRecipeInfo, id)
+      local info = infoOK and infoValues[1] or nil
+      if type(info) ~= "table" or type(info.learned) ~= "boolean" then
+        result.unknown = result.unknown + 1
+      elseif tonumber(info.recipeID) ~= id then
+        result.idMismatch = result.idMismatch + 1
+        result.unknown = result.unknown + 1
+      else
+        local bucket
+        if info.learned then
+          result.learnedTrue = result.learnedTrue + 1
+          bucket = learnedExamples
+        else
+          result.learnedFalse = result.learnedFalse + 1
+          bucket = unlearnedExamples
+        end
+        if #bucket < 2 then
+          bucket[#bucket + 1] = {
+            id = id, learned = info.learned,
+            name = stringValue(info.name):sub(1, 60), professionID = nil,
+          }
+        end
+      end
+    end
+  end
+  for _, bucket in ipairs({ learnedExamples, unlearnedExamples }) do
+    for _, example in ipairs(bucket) do
+      if result.professionLookup then
+        local lookupOK, lookupValues = invoke(owner.GetProfessionInfoByRecipeID, example.id)
+        local profession = lookupOK and lookupValues[1] or nil
+        if type(profession) == "table" then
+          example.professionID = tonumber(profession.professionID)
+          example.professionName = stringValue(profession.professionName):sub(1, 40)
+        end
+      end
+      result.examples[#result.examples + 1] = example
+    end
+  end
+  return result
+end
+
+function Probe:FormatRecipeComparisonLines(result)
+  result = result or self:CompareRecipeIDs()
+  local lines = { "recipecheck is read-only; no recipes are saved" }
+  if not result.available then
+    lines[#lines + 1] = "recipecheck " .. tostring(result.error or "unavailable")
+    return lines
+  end
+  local countLabel = result.listCount > result.limit and (">=" .. tostring(result.listCount))
+    or tostring(result.listCount)
+  lines[#lines + 1] = "all-list " .. countLabel .. " IDs; inspected " .. tostring(result.inspected)
+    .. "/" .. tostring(result.limit) .. "; learned " .. tostring(result.learnedTrue)
+    .. ", unlearned " .. tostring(result.learnedFalse)
+    .. ", unknown " .. tostring(result.unknown)
+    .. ", ID mismatches " .. tostring(result.idMismatch)
+  lines[#lines + 1] = "profession lookup " .. (result.professionLookup and "available" or "unavailable")
+  for _, example in ipairs(result.examples) do
+    local profession = example.professionID and ("profession " .. tostring(example.professionID))
+      or "profession unknown"
+    lines[#lines + 1] = "recipe " .. tostring(example.id) .. " "
+      .. (example.learned and "learned" or "unlearned") .. " "
+      .. example.name .. " (" .. profession .. ")"
+  end
+  lines[#lines + 1] = "Compare an ID with wowhead.com/forever/spell=ID; a match does not prove learned state."
+  return lines
+end
+
 local function readContainerInfo(container, bag, slot)
   local ok, values = invoke(container.GetContainerItemInfo, bag, slot)
   if not ok then return false, false, 0 end

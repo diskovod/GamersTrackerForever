@@ -43,6 +43,13 @@ C_TradeSkillUI = {
     calls.modernLists = calls.modernLists + 1
     return { [9001] = true, [9002] = true, [9003] = true, [9004] = true }
   end,
+  GetAllRecipeIDs = function()
+    calls.modernLists = calls.modernLists + 1
+    return { 9001, 9002, 9003, 9004 }
+  end,
+  GetProfessionInfoByRecipeID = function()
+    return { professionID = 171, professionName = "Alchemy" }
+  end,
   GetRecipeInfo = function(recipeID)
     calls.detailInfo = calls.detailInfo + 1
     return { recipeID = recipeID, name = "Secret Recipe", learned = recipeID % 2 == 1, craftedItemID = 777 }
@@ -129,6 +136,9 @@ assert(result.tradeSkills.modern.namespacePresent == true)
 assert(result.tradeSkills.modern.window == "closed")
 assert(result.tradeSkills.modern.attempted == false and result.tradeSkills.modern.calls == 0)
 assert(calls.modernLine == 0 and calls.modernLists == 0, "closed profession window must not enumerate modern recipes")
+local closedComparison = probe:CompareRecipeIDs()
+assert(closedComparison.window == "closed" and closedComparison.inspected == 0,
+  "recipe comparison must not enumerate when profession window is closed")
 assert(result.bags.source == "C_Container" and result.bags.itemSlots == 1 and result.bags.itemCount == 7)
 assert(result.bank.slotProbePerformed == false and result.bank.accessible == false)
 assert(calls.bank == 1 and calls.item > 0)
@@ -159,13 +169,40 @@ assert(openResult.tradeSkills.modern.recipeDetails.schematic.outputItemKnown == 
 assert(openResult.tradeSkills.modern.recipeDetails.schematic.quantityRangeKnown == 3)
 assert(openResult.tradeSkills.modern.recipeDetails.schematic.slotQuantityKnown == 3)
 assert(openResult.tradeSkills.modern.recipeDetails.schematic.exactlyOneItemReagent == 3)
-assert(calls.modernLine == 1 and calls.modernLists == 2)
+assert(calls.modernLine == 1 and calls.modernLists == 3)
 assert(calls.detailInfo == 3 and calls.detailSchematic == 3, "detail calls must stay bounded by the sample")
 local openOutput = table.concat(probe:FormatLines(openResult), "\n")
 assert(not openOutput:match("9001") and not openOutput:match("skillLineID"))
 assert(not openOutput:match("Secret Recipe") and not openOutput:match("Secret Reagent")
   and not openOutput:match("777") and not openOutput:match("888"), "probe output must not leak detail names or IDs")
 assert(openResult.tradeSkills.modern.recipeDetails.recipeID == nil, "detail probe must discard sampled recipe IDs")
+local comparison = probe:CompareRecipeIDs()
+assert(comparison.available and comparison.inspected == 4 and comparison.learnedTrue == 2
+  and comparison.learnedFalse == 2 and comparison.unknown == 0,
+  "all-list comparison must include both learned and unlearned IDs")
+local learnedExample, unlearnedExample = false, false
+for _, example in ipairs(comparison.examples) do
+  if example.learned == true and example.id % 2 == 1 then learnedExample = true end
+  if example.learned == false and example.id % 2 == 0 then unlearnedExample = true end
+end
+assert(learnedExample, "comparison keeps a bounded learned example")
+assert(unlearnedExample, "comparison keeps a bounded unlearned example")
+assert(comparison.examples[1].professionID == 171, "comparison probes profession ownership when available")
+local comparisonOutput = table.concat(probe:FormatRecipeComparisonLines(comparison), "\n")
+assert(comparisonOutput:match("recipe 9001") and comparisonOutput:match("recipe 9002")
+  and comparisonOutput:match("learned 2, unlearned 2"), "recipecheck prints bounded ID evidence")
+local allRecipeIDs = C_TradeSkillUI.GetAllRecipeIDs
+C_TradeSkillUI.GetAllRecipeIDs = function() return { [9001] = true, [9002] = true } end
+local keyedComparison = probe:CompareRecipeIDs()
+assert(keyedComparison.inspected == 2 and keyedComparison.learnedTrue == 1
+  and keyedComparison.learnedFalse == 1, "ID-keyed list shape is supported")
+C_TradeSkillUI.GetAllRecipeIDs = allRecipeIDs
+local checkedRecipeInfo = C_TradeSkillUI.GetRecipeInfo
+C_TradeSkillUI.GetRecipeInfo = function() return { recipeID = 9999, learned = true } end
+local mismatchedComparison = probe:CompareRecipeIDs()
+assert(mismatchedComparison.learnedTrue == 0 and mismatchedComparison.unknown == 4
+  and mismatchedComparison.idMismatch == 4, "mismatched IDs must not establish learned state")
+C_TradeSkillUI.GetRecipeInfo = checkedRecipeInfo
 local recipeInfo, recipeSchematic = C_TradeSkillUI.GetRecipeInfo, C_TradeSkillUI.GetRecipeSchematic
 C_TradeSkillUI.GetRecipeInfo = function() error("detail unavailable") end
 C_TradeSkillUI.GetRecipeSchematic = function() error("schematic unavailable") end
@@ -188,6 +225,11 @@ for _, file in ipairs({ "EventDispatcher.lua", "SlashCommands.lua", "Repository.
   chunk()
 end
 assert(GamersTrackerForever:Initialize())
+local chatMessages = {}
+DEFAULT_CHAT_FRAME = { AddMessage = function(_, message) chatMessages[#chatMessages + 1] = message end }
+SlashCmdList.GAMERSTRACKERFOREVER("recipecheck")
+assert(table.concat(chatMessages, "\n"):match("learned 2, unlearned 2"),
+  "recipecheck slash command prints the read-only comparison")
 assert(GamersTrackerForever.product == "forever_beta")
 assert(GamersTrackerForever.Inventory ~= nil and GamersTrackerForever.Characters ~= nil)
 assert(GamersTrackerForever.Professions ~= nil and GamersTrackerForever.Professions.rankOnly)

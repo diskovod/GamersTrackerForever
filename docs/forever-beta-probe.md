@@ -38,6 +38,14 @@ claim based on the version number.
    establish that the learned flag distinguishes known and unknown recipes,
    the list covers all learned recipes rather than the active filter, and the
    detail fields provide complete output and reagent data.
+   Then run `/gtf recipecheck` in that same open window. This separate,
+   read-only diagnostic inspects at most 200 IDs from `GetAllRecipeIDs`,
+   classifies only records whose returned recipe ID matches and whose
+   `learned` field is a boolean, and prints at most two learned and two
+   unlearned ID/name examples. If available, it also prints their profession
+   IDs. Unlike the aggregate `/gtf probe`, these public recipe names and IDs
+   are shown so they can be compared with the visible profession and
+   Wowhead Forever `/spell=ID` pages. It does not save a recipe set.
 6. Run the command once with the bank closed. If bank access is reported as
    unknown, open the bank normally and run it again. Bank slot contents are
    deliberately never read by the probe.
@@ -52,7 +60,7 @@ claim based on the version number.
 ## What to send for a recipe adapter
 
 Send the `/gtf probe` output from the closed-window run and from each open
-profession run. The useful evidence is the client/build/interface line, the
+profession run, plus `/gtf recipecheck` with the profession window open. The useful evidence is the client/build/interface line, the
 `modern trade C_TradeSkillUI` availability line, the detected window state,
 line/list counts, and detail sample aggregates. Do not send screenshots or logs
 containing account paths, item names, or recipe links. These probe results
