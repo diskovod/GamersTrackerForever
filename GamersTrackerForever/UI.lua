@@ -120,6 +120,45 @@ local function setIcon(texture, value)
   end
 end
 
+local ITEM_QUALITY_COLORS_FALLBACK = {
+  [0] = { 0.62, 0.62, 0.62 }, [1] = { 1, 1, 1 },
+  [2] = { 0.12, 1, 0 }, [3] = { 0, 0.44, 0.87 },
+  [4] = { 0.64, 0.21, 0.93 }, [5] = { 1, 0.5, 0 },
+}
+
+local function outputQualityColor(self, recipe)
+  local itemID = recipe and tonumber(recipe.outputItemID)
+  if not itemID or itemID <= 0 then return nil end
+  local env = self.env or _G
+  local quality
+  if type(env.GetItemInfo) == "function" then
+    local ok, _, _, value = pcall(env.GetItemInfo, itemID)
+    if ok then quality = tonumber(value) end
+  end
+  local itemAPI = env.C_Item
+  if not quality and type(itemAPI) == "table" and type(itemAPI.GetItemQualityByID) == "function" then
+    local ok, value = pcall(itemAPI.GetItemQualityByID, itemID)
+    if ok then quality = tonumber(value) end
+  end
+  if not quality then return nil end
+  if type(env.GetItemQualityColor) == "function" then
+    local ok, r, g, b = pcall(env.GetItemQualityColor, quality)
+    if ok and type(r) == "number" and type(g) == "number" and type(b) == "number" then
+      return r, g, b
+    end
+  end
+  local native = type(env.ITEM_QUALITY_COLORS) == "table" and env.ITEM_QUALITY_COLORS[quality]
+  if type(native) == "table" then
+    local r, g, b = native.r or native[1], native.g or native[2], native.b or native[3]
+    if type(r) == "number" and type(g) == "number" and type(b) == "number" then
+      return r, g, b
+    end
+  end
+  local fallback = ITEM_QUALITY_COLORS_FALLBACK[quality]
+  if fallback then return fallback[1], fallback[2], fallback[3] end
+  return nil
+end
+
 local function wearabilityMarker(self, recipe)
   local usability = GTF.ItemUsability
   if type(recipe) ~= "table" or not usability
@@ -224,13 +263,7 @@ function UI:Initialize(dependencies)
   self.trackedHeader = label(frame, "GameFontNormal", "TOPLEFT", frame, 380, -15, 170, 20)
   self.close = button(frame, "Close", 70, 22); self.close:SetPoint("TOPRIGHT", -12, -10); self.close:SetScript("OnClick", function() self:Hide() end)
   self.tabs = {}
-  local recipesTab = button(frame, "All Recipes", 100, 24); recipesTab:SetPoint("TOPLEFT", 14, -42)
-  self.tabs.recipes = recipesTab
-  if not self.recipesSupported then
-    recipesTab:Hide()
-  end
-  recipesTab:SetScript("OnClick", function() self.tab = "recipes"; self:Refresh() end)
-  self.body = CreateFrame("Frame", nil, frame); self.body:SetPoint("TOPLEFT", 10, -72); self.body:SetPoint("BOTTOMRIGHT", -10, 10)
+  self.body = CreateFrame("Frame", nil, frame); self.body:SetPoint("TOPLEFT", 10, -42); self.body:SetPoint("BOTTOMRIGHT", -10, 10)
   local leftOK, leftFrame = pcall(CreateFrame, "Frame", nil, self.body, "BackdropTemplate")
   self.leftPane = leftOK and leftFrame or CreateFrame("Frame", nil, self.body)
   self.leftPane:SetPoint("TOPLEFT", 0, 0); self.leftPane:SetPoint("BOTTOMLEFT", 0, 0); self.leftPane:SetWidth(286)
@@ -346,19 +379,35 @@ function UI:RefreshCharacters(productKey, product)
     height = height or 24
     local width = math.max(1, 262 - indent)
     if onClick then
-      local row = CreateFrame("Button", nil, self.characterContent)
+      local row
+      if style and style.kind == "category" then
+        local ok, rounded = pcall(CreateFrame, "Button", nil, self.characterContent, "BackdropTemplate")
+        row = ok and rounded or CreateFrame("Button", nil, self.characterContent)
+      else
+        row = CreateFrame("Button", nil, self.characterContent)
+      end
       local header = style and style.kind ~= "recipe"
       row:SetPoint("TOPLEFT", 2, y); row:SetSize(260, height)
       row.gtfStyle = style and style.kind or "plain"
-      if header then
+      if header and style.kind == "category" and type(row.SetBackdrop) == "function" then
+        row:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8",
+          edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
+          insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+        row:SetBackdropColor(0.26, 0.13, 0.055, 0.96)
+        if type(row.SetBackdropBorderColor) == "function" then
+          row:SetBackdropBorderColor(0.50, 0.34, 0.17, 1)
+        end
+        row.gtfBar = row
+        row.gtfRounded = true
+      elseif header then
         local bar = row:CreateTexture(nil, "BACKGROUND")
         bar:SetTexture("Interface\\Buttons\\WHITE8X8")
         bar:SetPoint("TOPLEFT", row, "TOPLEFT", 1, -2)
         bar:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -1, 2)
         if type(bar.SetVertexColor) == "function" then
           if style.kind == "character" then bar:SetVertexColor(0.25, 0.17, 0.09, 0.9)
-          elseif style.kind == "profession" then bar:SetVertexColor(0.18, 0.13, 0.08, 0.9)
-          else bar:SetVertexColor(0.20, 0.13, 0.07, 0.92) end
+          elseif style.kind == "profession" then bar:SetVertexColor(0.11, 0.17, 0.21, 0.94)
+          else bar:SetVertexColor(0.26, 0.13, 0.055, 0.96) end
         end
         row.gtfBar = bar
         for _, edge in ipairs({ "TOP", "BOTTOM" }) do
@@ -593,11 +642,25 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
   local icon = outputButton:CreateTexture(nil, "ARTWORK")
   icon:SetSize(42, 42); icon:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
   setIcon(icon, recipe and recipe.icon or recipeRow.icon)
+  local qualityR, qualityG, qualityB = outputQualityColor(self, recipe)
+  if qualityR then
+    local ring = outputButton:CreateTexture(nil, "OVERLAY")
+    ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    ring:SetSize(58, 58); ring:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
+    if type(ring.SetVertexColor) == "function" then
+      ring:SetVertexColor(qualityR, qualityG, qualityB, 1)
+    end
+    self.outputQualityRing = ring
+  end
   attachItemTooltip(self, outputButton, recipe and recipe.outputItemID, recipe and recipe.outputItemLink)
   self.outputItemButton = outputButton
   local title = label(itemPanel, "GameFontHighlightLarge", "TOPLEFT", itemPanel, 68, -19,
     width - 94, 25)
   title:SetText(recipeRow.name .. wearabilityMarker(self, recipe))
+  if qualityR and type(title.SetTextColor) == "function" then
+    title:SetTextColor(qualityR, qualityG, qualityB)
+  end
+  self.outputItemTitle = title
   self.detailRows[#self.detailRows + 1] = title
   self.materialCards = {}
   if type(recipe) ~= "table" then
@@ -618,8 +681,23 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
         kind = reagent.kind, status = "unknown" }
     end
   end
+  local function isResolvedMaterialName(value)
+    if type(value) ~= "string" or value == "" or value == "Unknown material" then return false end
+    return not value:match("^[Ii]tem%s*#?%s*%d+$") and not value:match("^%d+$")
+  end
   local materialRows = GTF.ViewModels.BuildMaterialRows(recipe, calc, {
-    itemResolver = function(itemID) return resolveItem(self, itemID) end,
+    itemResolver = function(itemID)
+      local name, link, icon = resolveItem(self, itemID)
+      if not isResolvedMaterialName(name) then
+        local env = self.env or _G
+        local itemAPI = env.C_Item
+        if type(itemAPI) == "table" and type(itemAPI.GetItemNameByID) == "function" then
+          local ok, cachedName = pcall(itemAPI.GetItemNameByID, itemID)
+          if ok and isResolvedMaterialName(cachedName) then name = cachedName end
+        end
+      end
+      return name, link, icon
+    end,
   })
   if #materialRows == 0 then
     local empty = label(itemPanel, "GameFontDisableSmall", "TOPLEFT", itemPanel, 16, -94, width - 48, 24)
@@ -750,6 +828,7 @@ end
 function UI:RefreshDetail(productKey, product, characterKey)
   hideRows(self.detailRows); self.detailRows = {}; self.materialCards = {}; self.sourceRows = {}
   self.sourceCards = {}; self.sourcePanel = nil; self.outputItemButton = nil
+  self.outputQualityRing = nil; self.outputItemTitle = nil
   local settings = self.repository and self.repository.db and self.repository.db.settings or {}
   local model = GTF.ViewModels.BuildCharacterDetail(product, characterKey, {
     now = now(self.env), settings = settings, includeInventoryRows = false,

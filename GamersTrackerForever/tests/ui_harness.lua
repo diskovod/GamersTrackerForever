@@ -80,6 +80,9 @@ local function mockFrame()
   function f:Show() self.shown = true end; function f:Hide() self.shown = false end; function f:IsShown() return self.shown end; function f:SetShown(v) self.shown = v end
   function f:SetBackdrop(value) self.backdrop = value end
   function f:SetBackdropColor(...) self.backdropColor = { ... } end
+  function f:SetBackdropBorderColor(...) self.backdropBorderColor = { ... } end
+  function f:SetVertexColor(...) self.vertexColor = { ... } end
+  function f:SetTextColor(...) self.textColor = { ... } end
   function f:SetScrollChild(v) self.child = v end
   function f:SetAutoFocus() end; function f:SetTextInsets() end; function f:SetHighlightTexture() end; function f:ClearFocus() end
   function f:SetText(v) self.text = v end; function f:GetText() return self.text or "" end
@@ -131,7 +134,10 @@ _G.GameTooltip_ShowCompareItem = function(tooltip) comparedTooltip = tooltip end
 product.recipes["recipe:1"].categoryPath = { "Alchemy", "Potions", "Healing" }
 local ui = GamersTrackerForever.UI:Create({ env = {
   time = function() return 2000 end,
-  GetItemInfo = function() return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555 end,
+  GetItemInfo = function(itemID)
+    if itemID == 900 then return "Test Potion", nil, 2, nil, nil, nil, nil, nil, nil, 900 end
+    return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555
+  end,
 }, repository = repo, catalog = catalog, craftabilityService = service, productKey = "classic_era" })
 ui:Initialize()
 assert(ui.frame and ui.initialized and ui.title and ui.characterScroll, "mocked-frame UI initializes")
@@ -144,8 +150,8 @@ same(ui.leftPane.backdrop.edgeFile, "Interface\\Tooltips\\UI-Tooltip-Border",
   "profession-like left panel has a distinct framed border")
 same(ui.searchIcon.texture, "Interface\\Common\\UI-Searchbox-Icon",
   "search control has a native search icon")
-assert(not ui.tabs.characters and ui.tabs.recipes.text == "All Recipes"
-  and ui.tabs.recipes.point[1] == "TOPLEFT", "redundant Characters tab is removed without a header gap")
+assert(not ui.tabs.characters and not ui.tabs.recipes,
+  "the left-tree search replaces both Characters and All Recipes buttons")
 local sawMageIcon = false
 for _, row in ipairs(ui.rows or {}) do
   if row.classIcon and row.classIcon.texture == GamersTrackerForever.ClassIcons.TEXTURE then
@@ -193,7 +199,7 @@ assert(ui.expandedProfessions["ana|alchemy"] and ui.selectedProfessionKey == "al
   "profession expands beneath the selected character")
 assert(treeContains("Potions") and treeContains("Healing") and treeContains("Test Potion"),
   "native category hierarchy renders under the profession")
-local headerKinds, duplicateRoot = {}, false
+local headerKinds, duplicateRoot, professionColor, roundedCategory = {}, false, nil, false
 for _, row in ipairs(ui.rows or {}) do
   if row.gtfStyle and row.gtfStyle ~= "plain" then
     headerKinds[row.gtfStyle] = true
@@ -201,11 +207,20 @@ for _, row in ipairs(ui.rows or {}) do
       assert(row.gtfBar and row.gtfExpander, "tree headers use full-width bars and right-side expanders")
     end
     if row.gtfStyle == "category" and row.gtfLabel.text == "Alchemy" then duplicateRoot = true end
+    if row.gtfStyle == "category" then
+      roundedCategory = row.gtfRounded and row.backdrop
+        and row.backdrop.edgeFile == "Interface\\Tooltips\\UI-Tooltip-Border"
+    elseif row.gtfStyle == "profession" then
+      professionColor = row.gtfBar and row.gtfBar.vertexColor
+    end
   end
 end
 assert(headerKinds.character and headerKinds.profession and headerKinds.category and headerKinds.recipe,
   "character, profession, category, and recipe rows have distinct native-like styles")
 assert(not duplicateRoot, "category path does not repeat the profession root")
+assert(roundedCategory, "category headers use a rounded native border")
+assert(professionColor and professionColor[3] > professionColor[1],
+  "profession headers use a distinct cool color from warm category headers")
 local categoryKey = "ana|alchemy\031Potions"
 ui:ToggleCategory(categoryKey)
 assert(ui.expandedCategories[categoryKey] == false and treeContains("Potions")
@@ -224,6 +239,12 @@ assert(treeContains("Test Potion"), "reopening a category restores its recipes")
 ui:SelectRecipe("ana", "alchemy", "recipe:1")
 assert(ui.selectedRecipeKey == "recipe:1" and #ui.materialCards == 1,
   "recipe selection renders a material card")
+assert(ui.outputQualityRing and ui.outputQualityRing.texture == "Interface\\Minimap\\MiniMap-TrackingBorder",
+  "known crafted-item quality adds a circular border")
+assert(ui.outputQualityRing.vertexColor[2] > ui.outputQualityRing.vertexColor[1],
+  "uncommon crafted-item ring is green")
+assert(ui.outputItemTitle.textColor[2] > ui.outputItemTitle.textColor[1],
+  "crafted-item name follows the item quality color")
 assert(ui.sourcePanel and ui.sourcePanel ~= ui.detailRows[1],
   "item detail and material holders use separate framed panels")
 for _, row in ipairs(ui.detailRows or {}) do
@@ -293,9 +314,27 @@ assert(ui.sourceRows[1].gtfItemButton and type(ui.sourceRows[1].gtfItemButton.sc
   "holding icon keeps the native item tooltip")
 ui.env.GetItemInfo = function() return nil end
 ui:Refresh()
+assert(not ui.outputQualityRing and not ui.outputItemTitle.textColor,
+  "uncached crafted-item quality leaves its title and icon border neutral")
 same(ui.materialCards[1].fontStrings[1].text, "4/10",
   "uncached reagent keeps its count without showing Unknown material")
-ui.env.GetItemInfo = function() return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555 end
+ui.env.GetItemInfo = function(itemID)
+  if itemID == 900 then return "Test Potion", nil, 2, nil, nil, nil, nil, nil, nil, 900 end
+  return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555
+end
+ui.env.GetItemInfo = function() return nil end
+ui.env.C_Item = {
+  GetItemNameByID = function(itemID) if itemID == 100 then return "Copper Bar" end end,
+  GetItemIconByID = function(itemID) if itemID == 100 then return 555 end end,
+}
+ui:Refresh()
+same(ui.materialCards[1].fontStrings[1].text, "4/10 Copper Bar",
+  "cached C_Item reagent name is shown beside its required and owned count")
+ui.env.C_Item = nil
+ui.env.GetItemInfo = function(itemID)
+  if itemID == 900 then return "Test Potion", nil, 2, nil, nil, nil, nil, nil, nil, 900 end
+  return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555
+end
 ui:Refresh()
 ui:SelectCharacter("ana")
 assert(ui.selectedRecipeKey == nil, "selecting a character returns to its overview")
@@ -341,7 +380,7 @@ local sawPending = false
 for _, row in ipairs(betaUI.rows) do
   if tostring(row.text or ""):find("Recipes pending", 1, true) then sawPending = true end
 end
-assert(sawPending and not betaUI.tabs.recipes:IsShown(),
-  "Forever beta shows profession ranks but does not fabricate recipe choices")
+assert(sawPending and not betaUI.tabs.recipes,
+  "Forever beta shows profession ranks without an All Recipes button")
 
 print("GamersTrackerForever Task 6 UI/view-model harness: PASS")

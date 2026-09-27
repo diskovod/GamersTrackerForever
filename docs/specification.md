@@ -1,8 +1,8 @@
 # GamersTrackerForever — Addon Specification
 
-**Version:** 1.3 (selected-item presentation revision)
+**Version:** 1.4 (search-only recipe browsing and header styling)
 
-**Status:** Implemented in 0.3.0-beta.16; client acceptance remains partial
+**Status:** Implemented in 0.3.0-beta.18; client acceptance remains partial
 
 **Updated:** 2026-09-27
 
@@ -229,17 +229,15 @@ The MVP catalog shall contain recipes learned by at least one discovered charact
 
 Recipe definitions shall be deduplicated at product level. Characters shall store only the set of recipe IDs they know.
 
-The recipe browser shall support:
+The visible recipe browser shall support:
 
 - left-tree text search across character, profession, category, and recipe
   names, case-insensitively; matching descendants reveal their ancestors
   without permanently changing the user's expansion choices;
-- catalog text search by recipe/output name;
-- profession filter;
-- known-by-character filter;
-- craftable/shortage filter;
-- transfer-ecosystem filter;
-- sorting by name, profession, or craftability.
+
+The product-level catalog and calculation services may retain advanced query
+functions internally, but the main UI does not expose a separate All Recipes
+button or filter page. The left search field is the sole recipe-browsing input.
 
 Wowhead is not an MVP dependency. A future separately approved build-time catalog may add unlearned recipes and recipe sources after licensing and Forever data availability are resolved.
 
@@ -475,8 +473,10 @@ search field, icon, and clear control, followed by every locally discovered
 character. Each character row shows its full name, level, and a small class
 icon when a known class ID is saved. The row expands into profession headers
 with `rank/maxRank`, native recipe category headers, and learned recipe rows.
-Character, profession, and category headers use full-width brown/gold bars and
-right-aligned expand controls; recipe rows are compact with light text and a
+Character, profession, and category headers use full-width bars and
+right-aligned expand controls. Profession bars have a muted cool tone; category
+bars use a warmer bronze fill with rounded native-style borders. Recipe rows
+are compact with light text and a
 subtle selection highlight. A category root that merely repeats the profession
 name is suppressed. Category and profession headers are collapsible. The
 currently selected recipe is visually distinct; unknown class icons and
@@ -501,13 +501,11 @@ level, freshness, and professions. Character facts do not repeat above a
 selected item. The character overview has no raw bag item-ID dump, manual
 tracking controls, or Forget button.
 
-### 9.3 All Recipes view
+### 9.3 Recipe navigation
 
-The optional `All Recipes` header button opens the existing catalog/search
-view; it does not replace the persistent left character tree. Selecting a
-character, profession, or recipe returns to the corresponding detail view.
-Catalog controls retain recipe search and filters for profession, character,
-craftability/shortage, and transfer ecosystem where supported.
+There is no `All Recipes` button. Search in the persistent left tree filters
+characters, professions, native categories, and recipe names. Selecting a
+character, profession, or recipe changes only the right-side detail view.
 
 ### 9.4 Recipe detail, material panel, and item hints
 
@@ -517,6 +515,9 @@ reagent list with icons, names, and owned/required quantities. No character
 identity, profession rank, craftability status sentence, or raw item ID appears
 in this item view. If an item name is not cached, omit the name and show only
 the icon and quantity; keep the ID internally for lookup and tooltip.
+When the client reports the crafted item's quality, tint the output name and a
+circular border around its icon with the matching item-quality color (for
+example, green for an uncommon item). Unknown quality keeps a neutral display.
 
 Below it, a separate **Who has the materials** subpanel groups holdings by
 character. Include only a character with a positive known quantity for at
@@ -768,8 +769,8 @@ Owner: one Luna/high agent.
 Deliverables:
 
 - main window and saved geometry;
-- persistent character/profession/recipe tree and optional All Recipes view;
-- search and recipe filters;
+- persistent character/profession/recipe tree;
+- left-tree search;
 - material matrix;
 - freshness states and tooltips;
 - automatic character inclusion and a scoped cleanup API (not exposed in the

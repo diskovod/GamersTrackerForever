@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.16 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.18 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.16.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.18.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -23,14 +23,18 @@
 - Every character that logs in with the addon is included automatically; there
   is no tracking limit or separate Characters tab. The left pane has a search
   field and a Character → Profession → Category → Recipe tree styled like the
-  native profession list, with framed category bars and white recipe names.
+  native profession list, with cool-toned profession bars, rounded bronze
+  category bars, and white recipe names.
   Expand a character and profession to browse captured recipes, then select a
-  recipe to see a framed item-and-reagents block on the right. A separate
+  recipe to see a framed item-and-reagents block on the right. The selected
+  output item's name and circular icon border use its item-quality
+  color when the client can report that quality. Reagent names appear beside
+  their icons and quantities whenever the client supplies them. A separate
   character-grouped block shows only positive material holdings as icons and
   counts. Selecting the character row shows its identity and scan freshness;
   those details do not repeat on the recipe page. Categories appear when the
-  client exposes them; otherwise recipes are grouped as Uncategorized. The
-  All Recipes button opens the cross-character recipe view.
+  client exposes them; otherwise recipes are grouped as Uncategorized. There
+  is no All Recipes button; use the left search field to find recipes.
   Hover a recipe row, crafted item icon, or material card for the native item
   tooltip. An equipped-item comparison appears when the client provides it.
   A small class icon identifies each character. A red X marks equipment the
