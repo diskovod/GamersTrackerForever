@@ -3,10 +3,14 @@ GamersTrackerForever = GamersTrackerForever or {}
 local GTF = GamersTrackerForever
 
 GTF.ADDON_NAME = "GamersTrackerForever"
-GTF.ADDON_VERSION = "0.2.1"
+GTF.ADDON_VERSION = "0.3.0-beta.1"
 GTF.SCHEMA_VERSION = 1
 GTF.DATA_VERSION = 1
 GTF.PRODUCT_CLASSIC_ERA = "classic_era"
+-- WoW Forever beta has a distinct SavedVariables partition.  It must never
+-- share snapshots with Classic Era even though the beta currently reports a
+-- Classic-looking project constant.
+GTF.PRODUCT_FOREVER_BETA = "forever_beta"
 -- Blizzard resolves these globals when Bindings.xml is loaded. Keep the
 -- machine-readable names stable while presenting readable key-bind labels.
 GTF.BINDING_HEADER = "GAMERSTRACKERFOREVER"
@@ -27,6 +31,7 @@ GTF.CAPABILITY = {
   SLASH_COMMANDS = "slash_commands",
   FOREVER_COMPATIBILITY_PROBE = "forever_compatibility_probe",
   SAVED_VARIABLES_PRODUCT_PARTITIONS = "saved_variables_product_partitions",
+  NATIVE_UI = "native_ui",
 }
 
 GTF.EVENTS = {

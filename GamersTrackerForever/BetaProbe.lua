@@ -227,6 +227,148 @@ function Probe:ReadTradeSkills()
       result.itemLinkReadable = itemOK and present(itemValues[1]) or false
     end
   end
+  result.modern = self:ReadModernTradeSkills()
+  return result
+end
+
+-- Forever has the profession enumeration API, but not the old global
+-- GetTradeSkill* functions.  Keep this diagnostic deliberately conservative:
+-- it records namespace/function availability all the time, and calls only
+-- bounded list/line methods after an already-open profession frame proves
+-- that a profession window is visible.  It never asks for recipe details,
+-- links, item names, or reagent data.
+local modernTradeFunctions = {
+  "IsTradeSkillReady",
+  "GetTradeSkillLineInfo",
+  "GetTradeSkillLineID",
+  "GetTradeSkillDisplayLine",
+  "GetTradeSkillListLink",
+  "GetRecipesForSkillLine",
+  "GetFilteredRecipeIDs",
+  "GetAllRecipeIDs",
+  "GetRecipeInfo",
+  "GetRecipeSchematic",
+  "GetRecipeItemLink",
+  "GetRecipeLink",
+}
+
+local relatedProfessionNamespaces = {
+  "C_TradeSkillUI",
+  "C_Professions",
+  "Professions",
+  "ProfessionsUtil",
+}
+
+local function namespaceFunctionMap(env, namespace, names)
+  local owner = env and env[namespace]
+  return {
+    present = type(owner) == "table",
+    functions = functionMap({}, names, owner),
+  }
+end
+
+local function boundedTableCount(value, limit)
+  if type(value) ~= "table" then return 0 end
+  local count = 0
+  for _ in pairs(value) do
+    count = count + 1
+    if count >= limit then return limit end
+  end
+  return count
+end
+
+local function returnShape(ok, values)
+  local first = values and values[1]
+  return {
+    attempted = true,
+    ok = ok == true,
+    returns = values and #values or 0,
+    firstType = type(first),
+    firstIsTable = type(first) == "table",
+    firstCount = boundedTableCount(first, 200),
+  }
+end
+
+local function visibleFrame(env, name)
+  local frame = env and env[name]
+  local frameType = type(frame)
+  if (frameType ~= "table" and frameType ~= "userdata") or type(frame.IsShown) ~= "function" then
+    return nil
+  end
+  local ok, values = invoke(frame.IsShown, frame)
+  if ok and type(values[1]) == "boolean" then return values[1] end
+  return nil
+end
+
+local function professionWindowState(env)
+  -- Names differ between clients.  A known frame is stronger evidence than
+  -- a readiness function because readiness may remain true after closing.
+  local inspected = false
+  for _, name in ipairs({ "ProfessionsFrame", "TradeSkillFrame", "C_TradeSkillFrame" }) do
+    local shown = visibleFrame(env, name)
+    if shown ~= nil then
+      inspected = true
+      -- Do not let an earlier hidden candidate mask a later visible frame.
+      if shown then return "open", true end
+    end
+  end
+  return inspected and "closed" or "unknown", inspected
+end
+
+function Probe:ReadModernTradeSkills()
+  local env = self.env
+  local namespaces = {}
+  for _, name in ipairs(relatedProfessionNamespaces) do
+    namespaces[name] = namespaceFunctionMap(env, name, modernTradeFunctions)
+  end
+
+  local owner = env.C_TradeSkillUI
+  local functions = functionMap({}, modernTradeFunctions, owner)
+  local window, windowKnown = professionWindowState(env)
+  local result = {
+    namespacePresent = type(owner) == "table",
+    functions = functions,
+    functionCount = countTrue(functions),
+    functionTotal = #modernTradeFunctions,
+    relatedNamespaces = namespaces,
+    window = window,
+    windowKnown = windowKnown,
+    attempted = false,
+    calls = 0,
+    errors = 0,
+    lineInfo = { attempted = false, ok = false, returns = 0, firstType = "nil", firstIsTable = false, firstCount = 0 },
+    recipeLists = {
+      getRecipesForSkillLine = { attempted = false, ok = false, returns = 0, firstType = "nil", firstIsTable = false, firstCount = 0 },
+      getFilteredRecipeIDs = { attempted = false, ok = false, returns = 0, firstType = "nil", firstIsTable = false, firstCount = 0 },
+      getAllRecipeIDs = { attempted = false, ok = false, returns = 0, firstType = "nil", firstIsTable = false, firstCount = 0 },
+    },
+  }
+
+  -- Function availability is useful with the window closed.  All calls that
+  -- could enumerate current profession/recipe data are gated by visibility.
+  if not result.namespacePresent or not windowKnown or window ~= "open" then
+    return result
+  end
+
+  result.attempted = true
+  local function inspect(name, target)
+    if not functions[name] then return end
+    result.calls = result.calls + 1
+    local ok, values = invoke(owner[name])
+    target.attempted = true
+    target.ok = ok == true
+    if ok then
+      local shape = returnShape(ok, values)
+      for key, value in pairs(shape) do target[key] = value end
+    else
+      result.errors = result.errors + 1
+    end
+  end
+
+  inspect("GetTradeSkillLineInfo", result.lineInfo)
+  inspect("GetRecipesForSkillLine", result.recipeLists.getRecipesForSkillLine)
+  inspect("GetFilteredRecipeIDs", result.recipeLists.getFilteredRecipeIDs)
+  inspect("GetAllRecipeIDs", result.recipeLists.getAllRecipeIDs)
   return result
 end
 
@@ -371,6 +513,18 @@ function Probe:FormatLines(result)
   result = result or self.lastResult or self:Run()
   local client, character = result.client, result.character
   local professions, trade, bags, bank, saved = result.professions, result.tradeSkills, result.bags, result.bank, result.savedVariables
+  local modern = trade.modern or {}
+  local lists = modern.recipeLists or {}
+  local function listShape(name)
+    local shape = lists[name] or {}
+    return yesNo(shape.ok) .. "/" .. tostring(shape.firstCount or 0)
+  end
+  local namespaceLine = {}
+  for _, name in ipairs(relatedProfessionNamespaces) do
+    local namespace = modern.relatedNamespaces and modern.relatedNamespaces[name]
+    namespaceLine[#namespaceLine + 1] = name .. " " .. yesNo(namespace and namespace.present)
+      .. " " .. tostring(namespace and countTrue(namespace.functions) or 0) .. "/" .. tostring(modern.functionTotal or #modernTradeFunctions)
+  end
   local lines = {
     "compatibility probe (read-only; no support claim)",
     "client version " .. (client.version ~= "" and client.version or "unknown") .. ", build " .. (client.build ~= "" and client.build or "unknown")
@@ -384,6 +538,13 @@ function Probe:FormatLines(result)
       .. yesNo(professions.functions.GetNumSkillLines) .. " (" .. tostring(professions.skillLines.readableRows) .. " readable)",
     "trade skills line " .. yesNo(trade.functions.GetTradeSkillLine) .. ", count " .. yesNo(trade.functions.GetNumTradeSkills)
       .. " (" .. tostring(trade.readableRows) .. " readable rows), recipe/item links " .. yesNo(trade.recipeLinkReadable) .. "/" .. yesNo(trade.itemLinkReadable),
+    "modern trade C_TradeSkillUI " .. yesNo(modern.namespacePresent) .. ", functions "
+      .. tostring(modern.functionCount or 0) .. "/" .. tostring(modern.functionTotal or #modernTradeFunctions)
+      .. ", window " .. tostring(modern.window or "unknown") .. ", probe " .. yesNo(modern.attempted),
+    "modern profession namespaces " .. table.concat(namespaceLine, ", "),
+    "modern trade line " .. yesNo(modern.lineInfo and modern.lineInfo.ok)
+      .. ", recipe lists ok/count GetRecipesForSkillLine " .. listShape("getRecipesForSkillLine")
+      .. ", filtered " .. listShape("getFilteredRecipeIDs") .. ", all " .. listShape("getAllRecipeIDs"),
     "bags " .. (bags.available and bags.source or "unavailable") .. ": " .. tostring(bags.slotsReadable) .. "/" .. tostring(bags.slotsReported)
       .. " readable slots, " .. tostring(bags.itemSlots) .. " occupied, " .. tostring(bags.itemCount) .. " total items",
     "bank APIs C_Container " .. tostring(countTrue(bank.cContainerFunctions)) .. "/2, legacy " .. tostring(countTrue(bank.legacyFunctions))

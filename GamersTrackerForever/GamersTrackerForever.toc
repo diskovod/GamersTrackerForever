@@ -1,16 +1,17 @@
-## Interface: 11509
+## Interface: 11509, 16001
 ## Title: GamersTrackerForever
 ## Notes: Last-known professions, recipes, and material snapshots for your characters.
 ## Author: GamersTrackerForever
-## Version: 0.2.1
+## Version: 0.3.0-beta.1
 ## SavedVariables: GamersTrackerForeverDB AltCraftTrackerDB
-## X-Product: Classic Era
+## X-Product: Classic Era, WoW Forever beta
 ## X-Data-Version: 1
 
 Constants.lua
 ApiCompat.lua
 ApiCompatInventory.lua
 ApiCompatProfessions.lua
+ApiCompatForever.lua
 BetaProbe.lua
 EventDispatcher.lua
 Repository.lua

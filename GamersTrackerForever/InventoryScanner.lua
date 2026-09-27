@@ -108,6 +108,16 @@ function InventoryScanner:Notify(result)
 end
 
 function InventoryScanner:IsBankAccessible()
+  -- A known unsupported capability is authoritative even after the event
+  -- dispatcher reports BANKFRAME_OPENED.  Some products inherit Classic's
+  -- bank methods, so frame state alone must never enable an unproven scan.
+  if self.api and type(self.api.GetCapabilities) == "function" then
+    local capabilities = self.api:GetCapabilities()
+    if type(capabilities) == "table"
+      and capabilities[GTF.CAPABILITY.BANK_INVENTORY_SCAN] == false then
+      return false
+    end
+  end
   if self.bankOpen then
     return true
   end
@@ -274,6 +284,15 @@ function InventoryScanner:HandleEvent(event, ...)
   if event == "BAG_UPDATE_DELAYED" or event == "BAG_UPDATE" then
     self:QueueBags()
   elseif event == "BANKFRAME_OPENED" then
+    if self.api and type(self.api.GetCapabilities) == "function" then
+      local capabilities = self.api:GetCapabilities()
+      if type(capabilities) == "table"
+        and capabilities[GTF.CAPABILITY.BANK_INVENTORY_SCAN] == false then
+        self.bankOpen = false
+        self.pendingBank = false
+        return
+      end
+    end
     self.bankOpen = true
     if self.api and type(self.api.SetBankAccessible) == "function" then self.api:SetBankAccessible(true) end
     self:QueueBank()

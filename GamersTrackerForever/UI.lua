@@ -104,6 +104,8 @@ function UI:Create(options)
   local self = setmetatable({ env = options.env or _G, repository = options.repository, catalog = options.catalog,
     craftability = options.craftabilityService or options.craftability, characterService = options.characterService,
     api = options.api, productKey = options.productKey, getGeometry = options.getGeometry, setGeometry = options.setGeometry,
+    professionsSupported = options.professionsSupported ~= false,
+    recipesSupported = options.recipesSupported ~= false,
     expandedCharacters = {}, expandedRecipes = {}, tab = "characters", rows = {}, recipeRows = {}, initialized = false,
     selectedCharacterKey = options.selectedCharacterKey, statusMessage = nil }, UI)
   return self
@@ -111,7 +113,7 @@ end
 
 function UI:SetDependencies(dependencies)
   dependencies = type(dependencies) == "table" and dependencies or {}
-  for _, key in ipairs({ "repository", "catalog", "craftability", "craftabilityService", "characterService", "api", "productKey", "getGeometry", "setGeometry" }) do
+  for _, key in ipairs({ "repository", "catalog", "craftability", "craftabilityService", "characterService", "api", "productKey", "getGeometry", "setGeometry", "professionsSupported", "recipesSupported" }) do
     if dependencies[key] ~= nil then self[key] = dependencies[key] end
   end
   self.craftability = self.craftability or self.craftabilityService
@@ -155,6 +157,9 @@ function UI:Initialize(dependencies)
   local charactersTab = button(frame, "Characters", 100, 24); charactersTab:SetPoint("TOPLEFT", 14, -42)
   local recipesTab = button(frame, "Recipes", 100, 24); recipesTab:SetPoint("LEFT", charactersTab, "RIGHT", 4, 0)
   self.tabs.characters, self.tabs.recipes = charactersTab, recipesTab
+  if not self.recipesSupported then
+    recipesTab:Hide()
+  end
   charactersTab:SetScript("OnClick", function() self.tab = "characters"; self:Refresh() end)
   recipesTab:SetScript("OnClick", function() self.tab = "recipes"; self:Refresh() end)
   self.body = CreateFrame("Frame", nil, frame); self.body:SetPoint("TOPLEFT", 10, -72); self.body:SetPoint("BOTTOMRIGHT", -10, 10)
@@ -259,10 +264,11 @@ function UI:Toggle() if self.frame and self.frame:IsShown() then self:Hide() els
 
 function UI:Refresh()
   if not self.frame then return end
+  if not self.recipesSupported and self.tab == "recipes" then self.tab = "characters" end
   local productKey, product = getProduct(self)
   self.title:SetText("GamersTrackerForever — " .. text(productKey, "unknown product"))
   self.characterScroll:Show()
-  self.detailScroll:SetShown(self.tab == "characters"); self.recipeControls:SetShown(self.tab == "recipes"); self.recipeScroll:SetShown(self.tab == "recipes")
+  self.detailScroll:SetShown(self.tab == "characters"); self.recipeControls:SetShown(self.recipesSupported and self.tab == "recipes"); self.recipeScroll:SetShown(self.recipesSupported and self.tab == "recipes")
   self:RefreshCharacters(productKey, product)
   if self.tab == "recipes" then self:RefreshRecipes(productKey, product) end
 end
@@ -322,7 +328,9 @@ function UI:RefreshDetail(productKey, product, characterKey)
   local track = button(self.detailContent, model.tracked and "Untrack" or "Track", 86, 22); track:SetPoint("TOPLEFT", 8, y - 2); track:SetScript("OnClick", function() local ok, err = self:SetTracked(model.key, not model.tracked); self.statusMessage = ok and nil or err; self:Refresh() end); self.detailRows[#self.detailRows + 1] = track
   local forget = button(self.detailContent, "Forget", 70, 22); forget:SetPoint("LEFT", track, "RIGHT", 5, 0); forget:SetScript("OnClick", function() self:ConfirmForget(productKey, model.key, model.name) end); self.detailRows[#self.detailRows + 1] = forget
   y = y - 30; add("Professions", "GameFontHighlight")
-  if #(model.professions or {}) == 0 then
+  if not self.professionsSupported then
+    add("Profession and recipe scanning is not enabled on this client.", "GameFontDisableSmall")
+  elseif #(model.professions or {}) == 0 then
     add("No profession data saved yet. Open a profession window to scan it.", "GameFontDisableSmall")
   else
     for _, profession in ipairs(model.professions or {}) do

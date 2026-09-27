@@ -1,11 +1,13 @@
-# GamersTrackerForever 0.2.1 — Classic Era / Season of Discovery installation
+# GamersTrackerForever 0.3.0-beta.1 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.2.1-classic.zip` so it creates exactly:
-   `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
-3. Start the Classic Era client and enable **GamersTrackerForever** on the character-selection AddOns list. The package targets interface **11509**.
+2. Extract `GamersTrackerForever-0.3.0-beta.1.zip` into the desired client so
+   it creates exactly one of these folders:
+   - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
+   - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
+3. Start the client and enable **GamersTrackerForever** on the character-selection AddOns list. The package declares interfaces **11509** and **16001**.
 
 ## Use
 
@@ -46,7 +48,8 @@ Material totals distinguish bags from bank, compatible transfer ecosystems from 
 - All eight fixture harnesses and the SoD static regression check pass. Complete
   in-client validation still requires the checklist in
   `tests\classic-era-acceptance-checklist.md`.
-- The installed Forever beta is build `1.60.1.69913` (`wow_classic_beta`). It
-  deliberately fails closed: only `/gtf probe` and `/gtf status` are active
-  until its runtime interface/API results justify a dedicated adapter. No
-  Forever support is claimed yet.
+- The Forever beta adapter is limited to character level, profession names and
+  ranks, bag snapshots, native UI, and `/gtf probe`. Beta recipes, bank scans,
+  and cross-character transfer calculations remain disabled. Test `/gtf probe`
+  once with professions closed and again with a profession open; see
+  `docs\forever-beta-probe.md` for the expected diagnostic lines.

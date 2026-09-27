@@ -105,6 +105,7 @@ function Scanner:Create(env, api, repository, options)
     schedule = options.schedule,
     debounceSeconds = number(options.debounceSeconds, 0.05),
     dataVersion = options.dataVersion or (GTF.DATA_VERSION or 1),
+    rankOnly = options.rankOnly == true,
     initialized = false,
     pendingTradeScan = false,
     tradeScanScheduled = false,
@@ -124,6 +125,7 @@ function Scanner:Initialize(api, repository, options)
     self.schedule = options.schedule or self.schedule
     self.debounceSeconds = number(options.debounceSeconds, self.debounceSeconds)
     self.dataVersion = options.dataVersion or self.dataVersion
+    self.rankOnly = options.rankOnly == true or self.rankOnly
   end
   self.initialized = true
   return true
@@ -547,6 +549,9 @@ function Scanner:HandleEvent(event, ...)
   elseif event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD"
     or event == "PLAYER_LOGOUT" then
     return self:RefreshRanks()
+  elseif self.rankOnly and (event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE"
+    or event == "TRADE_SKILL_CLOSE") then
+    return nil
   elseif event == "TRADE_SKILL_SHOW" or event == "TRADE_SKILL_UPDATE" then
     self.pendingTradeScan = true
     return { success = true, complete = false, pending = true, scheduled = self:_scheduleTradeSkill() }

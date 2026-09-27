@@ -5,6 +5,11 @@ $tocPath = Join-Path $addonRoot "GamersTrackerForever.toc"
 $tocEntries = Get-Content -LiteralPath $tocPath |
     Where-Object { $_ -and -not $_.StartsWith("##") }
 
+$tocHeader = Get-Content -LiteralPath $tocPath | Where-Object { $_ -like "## Interface:*" } | Select-Object -First 1
+if ($tocHeader -notmatch '^## Interface:\s*11509\s*,\s*16001\s*$') {
+    throw "TOC must declare both the proven Classic Era and Forever beta interfaces"
+}
+
 if ($tocEntries -contains "Bindings.xml") {
     throw "Bindings.xml is loaded as ordinary UI XML and produces SoD XML warnings"
 }

@@ -1,13 +1,13 @@
 # World of Warcraft Forever beta compatibility report
 
-Date: 2026-09-20  
-Scope: read-only inspection of the installed client at `C:\Program Files (x86)\World of Warcraft\_classic_beta_` and the addon source under `GamersTrackerForever\GamersTrackerForever`.
+Updated: 2026-09-27
+Scope: installed beta client, user-supplied `/gtf status` and `/gtf probe` output, and addon source.
 
 ## Executive result
 
-The installed client is a real `wow_classic_beta` build, not the Classic Era build that the addon currently declares. The client reports version `1.60.1.69913` / build `69913`, branch `1.60.1`, while the addon TOC declares interface `11509` and product `Classic Era`. This is an **unreleased/test-only integration** until the addon has a beta-specific product/interface policy and has been loaded in this client.
+The installed client is `wow_classic_beta`; its executable is now build `1.60.1.70009`. The user's in-game probe on the earlier `69913` build reported interface `16001` and project `1`. A separate `forever_beta` adapter now saves character level, profession ranks, and bag snapshots when that interface/project shape is present. The addon declares interfaces `11509, 16001`; the current build's in-game interface and UI persistence still need verification.
 
-The current client cannot explain the bag symptom or validate the new UI: `Interface\AddOns` is empty, the beta SavedVariables contain no addon database, and the client error report says `Addons.HasAny.Loaded: No` and `LuaErrors: 0`. The observed beta crashes are graphics/client assertions, not addon Lua failures.
+The user's in-game probe found `C_Container` with 44/44 readable bag slots and 129 items, plus four readable profession entries. It found no legacy trade-skill line/count APIs and no accessible bank. The previous no-addon crash report predates this runtime probe; its graphics assertion is not evidence of an addon Lua failure.
 
 The source already contains the requested native WoW split UI: a character list and tracking-limit dropdown on the left, and a larger detail/recipe pane on the right. It does not use HTML. Whether those native templates and APIs are present with the beta build remains a runtime gate.
 
@@ -16,20 +16,20 @@ The source already contains the requested native WoW split UI: a character list 
 | Fact | Evidence | Interpretation |
 |---|---|---|
 | Client flavor | `C:\Program Files (x86)\World of Warcraft\_classic_beta_\.flavor.info:1-2` contains `Product Flavor!STRING:0` and `wow_classic_beta`. | Product identity is explicitly beta. |
-| Installed build manifest | `C:\Program Files (x86)\World of Warcraft\.build.info:1-3` has a `wow_classic_beta` row with version `1.60.1.69913`; the same file has a separate `wow_classic_era` row at `1.15.9.69722`. | Beta and Era are distinct products/build lines in the installed client. |
-| Executable metadata | `C:\Program Files (x86)\World of Warcraft\_classic_beta_\WowB.exe` reports FileVersion/ProductVersion `1.60.1.69913`, ProductName `World of Warcraft`, CompanyName `Blizzard Entertainment`. | The executable agrees with the manifest. |
+| Installed build manifest | `C:\Program Files (x86)\World of Warcraft\.build.info` has a `wow_classic_beta` row with version `1.60.1.70009`; the separate `wow_classic_era` row remains `1.15.9.69722`. | Beta and Era are distinct products/build lines in the installed client. |
+| Executable metadata | `C:\Program Files (x86)\World of Warcraft\_classic_beta_\WowB.exe` reports FileVersion/ProductVersion `1.60.1.70009`. | The executable agrees with the current manifest. |
 | Runtime build | `...\_classic_beta_\Logs\gx.log:1-4` reports `World of Warcraft Beta x86_64 1.60.1.69913`; `Sound.log:1-3` reports WoW `1.60.1 (69913)`. | Runtime is the beta x64 client. |
 | Realm build | `...\Logs\Aurora.log:30` records realm `Classic Beta PvP 2` with version `1.60.1.69800`; the latest error report records `<Realm.Version> 1.60.1.69800` at `...\Errors\2026-09-19_21.33.28_Error_40624.txt:107-110`. | Realm/client patch numbers can differ by build; use the client `GetBuildInfo()` result for addon diagnostics and retain realm version separately. |
-| No addon runtime | `...\Errors\2026-09-19_21.33.28_Error_40624.txt:94-101` says `Addons.Current (null)`, `Addons.HasAny.Loading No`, `Addons.HasAny.Loaded No`, `LuaErrors 0`; `...\Interface\AddOns` has zero entries. | No conclusion about addon API behavior can be drawn from this session. |
+| In-game probe | User screenshots from September 20 show version `1.60.1`, build `69913`, interface `16001`, project `1`; `GetProfessions` returned four readable entries; `C_Container` returned 44/44 readable bag slots and 129 items; legacy trade-skill line/count APIs were absent. | These are the proven beta capabilities used by the partial adapter. |
 | Existing crash class | `...\Errors\2026-09-19_21.33.28_Error_40624.txt:9-13,60-73` reports an engine `IndirectTextureArray.cpp` assertion, build 69913, beta config; `...\Logs\gx.log:38-52` reports GPU hung/device lost and recovery. | Current client crashes are unrelated to addon Lua. Keep them separate from addon release gating. |
 
 ## Addon-to-client compatibility comparison
 
 ### Product and interface identity — high risk / not release-ready
 
-The TOC declares `## Interface: 11509` and `## X-Product: Classic Era` at `GamersTrackerForever\GamersTrackerForever.toc:1-8`. The beta client is `1.60.1.69913` and `wow_classic_beta` as shown above. The local evidence does not expose the beta's numeric TOC interface value, so it is not safe to invent one; the loader must be queried at runtime or the beta's own AddOn list must be observed.
+The TOC now declares `## Interface: 11509, 16001`, matching the proven Era and Forever interface values. Local TOC examples (Questie/Plater) confirm comma-separated interface values are accepted. The addon still gates runtime selection by `GetBuildInfo()` and project evidence; a matching TOC value alone never selects an adapter.
 
-`ApiCompat.lua` now uses a fail-closed allowlist: only the verified `1.15.x` client family may select the Classic adapter. A missing project marker is no longer enough, and a beta that reuses project ID `2` but reports `1.60.x` is routed to an explicit `unsupported:2` partition. Unsupported products use a read-only adapter and do not construct Classic scanners. Product detection still captures `version`, `build`, `interface`, `WOW_PROJECT_ID`, and a beta/era marker through the separate probe; no beta support is claimed.
+`ApiCompat.lua` now uses a fail-closed allowlist: verified `1.15.x` selects `classic_era`, while the proven Forever shape (`WOW_PROJECT_ID == 1`, version `1.60.x`, interface `16001`) selects the dedicated writable `forever_beta` adapter. Unknown builds remain read-only and never construct Classic scanners. Product detection still captures `version`, `build`, `interface`, `WOW_PROJECT_ID`, and a beta/era marker through the separate probe.
 
 Recommended detection record:
 
@@ -40,15 +40,15 @@ wowProjectID = WOW_PROJECT_ID
 ruleset = explicit product key, never inferred only from missing project ID
 ```
 
-For this installed client, an allowlist should at minimum distinguish `wow_classic_beta` / `1.60.1.*` from `wow_classic_era` / `1.15.9.*`. Do not make the beta claim production-compatible merely because both branches are called Classic.
+The adapter allowlist distinguishes the `1.60.x` beta shape from `1.15.x` Classic Era; it requires beta project `1` and interface `16001`. Forever data is persisted under `products.forever_beta`, never `products.classic_era`. The current `70009` build will remain read-only if its in-game interface differs.
 
 ### Character identity and context — likely compatible, runtime required
 
-The adapter uses `UnitFullName`/`UnitName`, `GetRealmName`, `UnitClass`, `UnitFactionGroup`, `UnitGUID`, and `UnitLevel` (`ApiCompat.lua:54-90,115-128`). These are basic character-context APIs, but the beta must be exercised to verify return shapes and realm/faction values. The source stores the client build/interface alongside each character (`Repository.lua:137-160`), which is useful for diagnosing mixed Era/beta records.
+The Forever adapter uses the same proven `UnitFullName`/`UnitName`, `GetRealmName`, `UnitClass`, `UnitFactionGroup`, `UnitGUID`, and `UnitLevel` shape and writes the stable `forever_beta` product key. The source stores the client build/interface alongside each character, which is useful for diagnosing mixed Era/beta records.
 
 ### Bags and bank — code has both API branches, runtime required
 
-The inventory adapter supports either `C_Container.GetContainerNumSlots/GetContainerItemInfo` or legacy global `GetContainerNumSlots/GetContainerItemInfo` (`ApiCompatInventory.lua:90-140`). It derives bag IDs from `NUM_BAG_SLOTS` and bank IDs from `NUM_BANKBAGSLOTS` (`:35-64`) and deliberately refuses to infer bank accessibility from a stale cache (`:70-87`).
+The Forever adapter enables only the proven `C_Container.GetContainerNumSlots/GetContainerItemInfo` bag branch. It derives bag IDs from `NUM_BAG_SLOTS` and deliberately refuses bank scanning because the beta probe found bank access unavailable. It never falls back to legacy trade-skill or recipe code.
 
 The scanner commits only a complete, readable bag result (`InventoryScanner.lua:117-149,159-185`) and commits bank data only while bank access is true (`:188-230`). It listens for `BAG_UPDATE_DELAYED`, `BAG_UPDATE`, `BANKFRAME_OPENED`, `PLAYERBANKSLOTS_CHANGED`, and `BANKFRAME_CLOSED` (`:273-289`; event list `Constants.lua:30-45`). This is a reasonable compatibility shape, but the beta test must verify:
 
@@ -57,9 +57,9 @@ The scanner commits only a complete, readable bag result (`InventoryScanner.lua:
 3. Whether `BAG_UPDATE_DELAYED` fires after login and ordinary bag changes.
 4. Whether bank container `-1` and bank bag IDs are readable before `BANKFRAME_CLOSED`.
 
-### Professions and recipes — high risk / runtime required
+### Profession ranks enabled; recipes disabled
 
-Profession enumeration prefers `GetProfessions` + `GetProfessionInfo` and falls back to old skill-line APIs (`ApiCompatProfessions.lua:124-216`). Recipe scanning relies on the legacy trade-skill family: `GetTradeSkillLine`, `GetNumTradeSkills`, `GetTradeSkillInfo`, recipe/item links, and reagent APIs (`:221-357`). The client directory has `WTF\Account\...\SavedVariables\Blizzard_Professions.lua`, but that is Blizzard state, not proof that these globals exist or retain the Classic return signatures. The beta must be tested in an actual profession window; if the beta exposes only a newer `C_TradeSkillUI` surface, add a beta adapter before release.
+The probe found `GetProfessions`/`GetProfessionInfo` readable, while legacy skill-line and trade-skill recipe APIs are absent. The Forever adapter now saves profession names and current/max ranks from those readable enumeration calls under the `forever_beta` product partition. It does not infer or persist profession IDs from unverified return positions. Recipe scanning remains disabled, the Recipes tab stays hidden, and the beta scanner is wired in rank-only mode so trade-skill events cannot trigger the Classic recipe scan. Modern recipe detail probing is still required before enabling recipes.
 
 ### Events and UI templates — likely compatible, runtime required
 
@@ -75,12 +75,12 @@ Therefore the expected on-disk location, after a successful logout/reload, is th
 
 ## Explicit release-gate checklist
 
-- [ ] Install the addon into the beta client's `Interface\AddOns` in a test copy and confirm it appears in the AddOns list. Do not infer this from the current no-addon error reports.
-- [ ] Confirm the beta TOC interface value at runtime; update packaging/TOC policy so `1.60.1.*` is not silently treated as `1.15.9.*`.
-- [ ] Log `GetBuildInfo()` and project/product markers at `ADDON_LOADED`/`PLAYER_LOGIN`; fail closed on unknown product/build.
+- [x] Install the addon into the beta client's `Interface\AddOns`; the user ran `/gtf status` and `/gtf probe` on build `69913`.
+- [x] Confirm interface `16001` in-game on build `69913` and declare both TOC interfaces. Recheck the current `70009` build.
+- [x] Capture `GetBuildInfo()` and project markers through `/gtf probe`; fail closed on unknown product/build shape.
 - [ ] Confirm `CreateFrame`, `BackdropTemplate`, `UIPanelScrollFrameTemplate`, and `UIDropDownMenuTemplate` instantiate without errors.
 - [ ] Confirm the two-pane UI is visible, resizable, scrollable, and the tracking-limit dropdown persists a value of 1–3 (or the chosen maximum).
-- [ ] Confirm `C_Container` versus legacy bag APIs and validate bag totals against the live bags.
+- [x] Confirm `C_Container` on build `69913` with 44/44 readable slots and 129 counted items; compare those totals against live bags after deploying this build.
 - [ ] Confirm `BAG_UPDATE_DELAYED`/`BAG_UPDATE` and login retry behavior; verify a successful `bagsScannedAt` is written.
 - [ ] Open and close a bank, verify `BANKFRAME_OPENED` and `BANKFRAME_CLOSED`, and ensure the bank snapshot is not overwritten with an empty inaccessible cache.
 - [ ] Open each supported profession, verify enumeration and recipe/reagent links, and capture any Lua error/API return-shape mismatch.
@@ -90,4 +90,4 @@ Therefore the expected on-disk location, after a successful logout/reload, is th
 
 ## Recommended next implementation decision
 
-Keep the native two-pane UI and SavedVariables architecture. The fail-closed detector is now in place; the remaining beta gate is a beta-specific adapter plus the in-client API/UI test. Do not add HTML as a dependency for this panel. A server can be added later as an explicit export/sync layer over normalized `GamersTrackerForeverDB`, not as a replacement for the local SavedVariables write path.
+Keep the native two-pane UI and SavedVariables architecture. The partial beta adapter and product partition are in place; the remaining gates are in-client UI/persistence checks and a verified recipe/bank API path. A server can later consume an explicit export of `GamersTrackerForeverDB` through a companion uploader.

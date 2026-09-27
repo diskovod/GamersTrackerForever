@@ -84,7 +84,8 @@ function GTF:GetStatusLines()
     "product " .. tostring(client.product) .. ", client " .. tostring(client.version ~= "" and client.version or "unknown")
       .. ", build " .. tostring(client.build ~= "" and client.build or "unknown")
       .. ", interface " .. tostring(client.interface),
-    "API adapter " .. tostring(self.product == self.PRODUCT_CLASSIC_ERA and "Classic" or "unsupported") .. ", current key " .. tostring(context and context.key or "unknown"),
+    "API adapter " .. tostring(self.Api and type(self.Api.GetAdapterName) == "function" and self.Api:GetAdapterName()
+      or (self.product == self.PRODUCT_CLASSIC_ERA and "Classic" or "unsupported")) .. ", current key " .. tostring(context and context.key or "unknown"),
     "transfer ecosystem " .. tostring(context and context.transferGroup or "unknown"),
     "last character scan " .. tostring(self.Runtime and self.Runtime.lastContextEvent and (self.Runtime.lastContextEvent .. " at " .. tostring(self.Runtime.lastContextAt or "unknown")) or "not scanned"),
     "last profession scan " .. tostring(professionAt or "not scanned")
@@ -126,8 +127,8 @@ function GTF:Initialize()
   end
   self.Runtime = { scans = {}, lastError = nil }
   self.Api, self.product = self.ApiCompat.Detect(_G)
-  local supportedProduct = self.product == self.PRODUCT_CLASSIC_ERA
-    and type(self.Api.IsSupported) == "function" and self.Api:IsSupported()
+  local supportedProduct = type(self.Api.IsSupported) == "function" and self.Api:IsSupported()
+  local capabilities = self.Api.GetCapabilities and self.Api:GetCapabilities() or {}
   self.Repository = self.Repository:Create(_G)
   self.Repository:Initialize(_G.GamersTrackerForeverDB, self.Api)
   if not supportedProduct and type(self.Repository.SetReadOnly) == "function" then
@@ -167,8 +168,10 @@ function GTF:Initialize()
     self.CharacterServiceInstance = self.Characters
     self.Characters:Initialize(self.Dispatcher, self.Api, self.Repository, self.Inventory)
   end
+  if capabilities[self.CAPABILITY.PROFESSION_ENUMERATION] or capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] then
   if self.ProfessionScanner and type(self.ProfessionScanner.Create) == "function" then
     self.Professions = self.ProfessionScanner:Create(_G, self.Api, self.Repository, {
+      rankOnly = capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] ~= true,
       contextProvider = function()
         return self.Characters and self.Characters.currentContext or self.Api:GetCurrentContext()
       end,
@@ -179,7 +182,13 @@ function GTF:Initialize()
     })
     self.Professions:Initialize(self.Api, self.Repository)
     if self.Characters and self.Characters.SetProfessionScanner then self.Characters:SetProfessionScanner(self.Professions) end
-    for _, event in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "TRADE_SKILL_CLOSE", "PLAYER_LOGOUT" }) do
+    local professionEvents = { "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "PLAYER_LOGOUT" }
+    if capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] then
+      professionEvents[#professionEvents + 1] = "TRADE_SKILL_SHOW"
+      professionEvents[#professionEvents + 1] = "TRADE_SKILL_UPDATE"
+      professionEvents[#professionEvents + 1] = "TRADE_SKILL_CLOSE"
+    end
+    for _, event in ipairs(professionEvents) do
       local eventName = event
       self.Dispatcher:On(eventName, function(...)
         local ok, result = pcall(self.Professions.HandleEvent, self.Professions, eventName, ...)
@@ -189,17 +198,20 @@ function GTF:Initialize()
       end)
     end
   end
-  if self.CraftabilityService and type(self.CraftabilityService.Create) == "function" then
+  end
+  if capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] and self.CraftabilityService and type(self.CraftabilityService.Create) == "function" then
     self.Craftability = self.CraftabilityService:Create(self.Repository, { productKey = self.product })
   end
-  if self.RecipeCatalog and type(self.RecipeCatalog.Create) == "function" then
+  if capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] and self.RecipeCatalog and type(self.RecipeCatalog.Create) == "function" then
     self.Catalog = self.RecipeCatalog:Create(self.Repository, { productKey = self.product, craftabilityService = self.Craftability })
     if self.Catalog.SetCraftabilityService then self.Catalog:SetCraftabilityService(self.Craftability) end
   end
   if self.UI and type(self.UI.Create) == "function" then
     self.UI = self.UI:Create({ env = _G, repository = self.Repository, catalog = self.Catalog,
       craftabilityService = self.Craftability, characterService = self.Characters,
-      api = self.Api, productKey = self.product })
+      api = self.Api, productKey = self.product,
+      professionsSupported = capabilities[self.CAPABILITY.PROFESSION_ENUMERATION] == true,
+      recipesSupported = capabilities[self.CAPABILITY.LEARNED_RECIPE_SCAN] == true })
     if type(self.UI.Initialize) == "function" then self.UI:Initialize() end
   end
   if self.MinimapButton and type(self.MinimapButton.Create) == "function" then

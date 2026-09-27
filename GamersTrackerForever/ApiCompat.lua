@@ -167,6 +167,7 @@ function Classic:GetCapabilities()
     [GTF.CAPABILITY.SLASH_COMMANDS] = true,
     [GTF.CAPABILITY.FOREVER_COMPATIBILITY_PROBE] = true,
     [GTF.CAPABILITY.SAVED_VARIABLES_PRODUCT_PARTITIONS] = true,
+    [GTF.CAPABILITY.NATIVE_UI] = true,
   }
 end
 
@@ -233,6 +234,19 @@ function ApiCompat.Detect(env)
   local projectID = env.WOW_PROJECT_ID
   local classicID = env.WOW_PROJECT_CLASSIC_ERA or env.WOW_PROJECT_CLASSIC
   local verifiedBuild = isVerifiedClassicClient(env)
+  local version, _, _, interface = "", "", "", 0
+  if hasFunction(env, "GetBuildInfo") then
+    version, _, _, interface = env.GetBuildInfo()
+  end
+  -- Forever beta evidence: version 1.60.x, interface 16001, and the beta's
+  -- current project constant (1).  Check this before the unsupported branch
+  -- so its data receives the stable forever_beta partition.
+  local isForeverBeta = env.WOW_PROJECT_ID == 1
+    and type(version) == "string" and version:match("^1%.60%.") ~= nil
+    and tonumber(interface) == 16001
+  if isForeverBeta and ApiCompat.CreateForeverBeta then
+    return ApiCompat.CreateForeverBeta(env), GTF.PRODUCT_FOREVER_BETA
+  end
   local isClassic = verifiedBuild and (projectID == nil
     or (classicID ~= nil and projectID == classicID)
     or projectID == 2)
@@ -248,3 +262,9 @@ end
 
 GTF.ApiCompat.Classic = Classic
 GTF.ApiCompat.Unsupported = Unsupported
+
+function ApiCompat.CreateForeverBeta(env)
+  local adapter = setmetatable({ env = env or _G, productKey = GTF.PRODUCT_FOREVER_BETA }, ApiCompat.ForeverBeta)
+  adapter.clientInfo = adapter:ReadClientInfo()
+  return adapter
+end

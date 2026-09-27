@@ -11,10 +11,11 @@ overview/recipes pane on the right. Its `Track up to` control supports 1–10
 characters (default 3) and never silently untracks existing characters.
 
 The addon is informational. It does not move items, automate protected actions,
-or contact an external service. The installed Forever beta has been identified
-as `wow_classic_beta` build `1.60.1.69913`; it remains diagnostic-only until
-`/gtf probe` supplies the runtime interface and API evidence required by the
-compatibility gate.
+or contact an external service. The beta probe on build `1.60.1.69913`
+reported interface `16001`; the installed executable is now `1.60.1.70009`.
+The limited beta adapter supports character levels, profession
+ranks, and bag snapshots. Recipe and bank scanning remain disabled while their
+beta APIs are validated.
 
 Snapshots are stored locally in the account-wide `GamersTrackerForeverDB`
 SavedVariables table. WoW serializes it on `/reload`, logout, clean exit, or
@@ -29,6 +30,9 @@ Copy the [`GamersTrackerForever`](GamersTrackerForever) directory to:
 ```text
 World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\
 ```
+
+For the Forever beta, use
+`World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`.
 
 Enable **GamersTrackerForever** on the character-selection AddOns screen, then use
 `/gtf` (with `/act` retained as a compatibility alias). See [installation and usage](docs/installation.md) for details.
@@ -49,8 +53,7 @@ Enable **GamersTrackerForever** on the character-selection AddOns screen, then u
 
 ## Current validation status
 
-The supported manifest targets Classic Era/SoD interface `11509`, confirmed
-from the locally installed client metadata. All eight Lua fixture harnesses,
-the SoD XML regression, and diff validation pass locally. In-client acceptance
-still requires launching the relevant game client; the Forever beta is not yet
-declared compatible.
+The manifest targets Classic Era/SoD interface `11509` and Forever beta
+interface `16001`. All eight Lua fixture harnesses and the SoD XML regression
+pass locally. The partial Forever adapter still needs in-client UI and
+SavedVariables acceptance before full compatibility is claimed.
