@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.5 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.6 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.5.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.6.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -14,7 +14,7 @@
 - `/gtf` opens or toggles the tracker window (`/act` is a compatibility alias).
 - `/gtf status` prints adapter, client/build/interface, current key, scan times, database counts, and diagnostics.
 - `/gtf probe` prints a read-only compatibility report. It does not scan bank contents or enable an unsupported client.
-- `/gtf recipecheck` inspects up to 200 IDs from `GetAllRecipeIDs` while a profession is open and prints at most two learned and two unlearned examples. It is read-only; it does not save recipes. Use it to validate the beta recipe API before enabling capture.
+- `/gtf recipecheck` inspects up to 200 IDs from the all-professions `GetAllRecipeIDs` list while a profession is open and prints at most two learned and two unlearned examples. When the list is larger, its learned count is only a partial sample, not the character's total or the open profession's count. It is read-only and does not save recipes.
 - `/gtf minimap on|off|toggle` controls the optional minimap button (enabled by default); the same subcommands work through `/act`.
 - The key binding is **Toggle GamersTrackerForever**.
 - Use `/reload` after changing the addon files. The addon never forces a reload.

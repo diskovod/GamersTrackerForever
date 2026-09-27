@@ -577,6 +577,11 @@ function Probe:FormatRecipeComparisonLines(result)
     .. ", unlearned " .. tostring(result.learnedFalse)
     .. ", unknown " .. tostring(result.unknown)
     .. ", ID mismatches " .. tostring(result.idMismatch)
+  if result.listCount > result.limit then
+    lines[#lines + 1] = "partial sample only; counts are not a total and are not limited to the open profession"
+  else
+    lines[#lines + 1] = "all-list counts are not limited to the open profession"
+  end
   lines[#lines + 1] = "profession lookup " .. (result.professionLookup and "available" or "unavailable")
   for _, example in ipairs(result.examples) do
     local profession = example.professionID and ("profession " .. tostring(example.professionID))

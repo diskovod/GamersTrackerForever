@@ -33,6 +33,10 @@ The [Gethe UI-source branch list](https://github.com/Gethe/wow-ui-source/branche
 5. Add regression fixtures for list completeness, profession mapping, `learned=false`, stale cache preservation, and ambiguous reagents before lifting the Forever recipe gate.
 
 The addon now includes `/gtf recipecheck` as a bounded, read-only implementation
-of the ID comparison above. It prints a few learned/unlearned IDs and any
-available profession ID without changing filters or SavedVariables. Its live
-beta result is still pending; adding the diagnostic does not enable capture.
+of the ID comparison above. The live beta returned at least 201 all-list IDs,
+and 7 learned among only the 200 inspected IDs; that is a partial sample, not
+the character's learned total or a Blacksmithing-only count. It prints a few
+learned/unlearned IDs and any available profession ID without changing filters
+or SavedVariables. The verified examples include recipe spell 1230171
+(Sharpening Wheel, learned) and 1263041 (Anvil, unlearned), both associated
+with profession 2938. Adding the diagnostic does not enable capture.

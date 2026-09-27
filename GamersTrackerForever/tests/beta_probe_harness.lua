@@ -191,6 +191,24 @@ assert(comparison.examples[1].professionID == 171, "comparison probes profession
 local comparisonOutput = table.concat(probe:FormatRecipeComparisonLines(comparison), "\n")
 assert(comparisonOutput:match("recipe 9001") and comparisonOutput:match("recipe 9002")
   and comparisonOutput:match("learned 2, unlearned 2"), "recipecheck prints bounded ID evidence")
+local originalAllIDs = C_TradeSkillUI.GetAllRecipeIDs
+local originalInfoForPartial = C_TradeSkillUI.GetRecipeInfo
+C_TradeSkillUI.GetAllRecipeIDs = function()
+  local ids = {}
+  for id = 1, 201 do ids[id] = id end
+  return ids
+end
+C_TradeSkillUI.GetRecipeInfo = function(id)
+  return { recipeID = id, name = "Fixture Recipe", learned = id <= 7 or id == 201 }
+end
+local partialComparison = probe:CompareRecipeIDs()
+local partialOutput = table.concat(probe:FormatRecipeComparisonLines(partialComparison), "\n")
+assert(partialComparison.inspected == 200 and partialComparison.listCount == 201,
+  "large all-list comparison is deliberately capped")
+assert(partialOutput:match("partial") and partialOutput:match("not a total"),
+  "a capped comparison must never present its learned count as the character's total")
+C_TradeSkillUI.GetAllRecipeIDs = originalAllIDs
+C_TradeSkillUI.GetRecipeInfo = originalInfoForPartial
 local allRecipeIDs = C_TradeSkillUI.GetAllRecipeIDs
 C_TradeSkillUI.GetAllRecipeIDs = function() return { [9001] = true, [9002] = true } end
 local keyedComparison = probe:CompareRecipeIDs()
