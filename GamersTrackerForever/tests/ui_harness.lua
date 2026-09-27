@@ -241,6 +241,12 @@ assert(ui.selectedRecipeKey == "recipe:1" and #ui.materialCards == 1,
   "recipe selection renders a material card")
 assert(ui.outputQualityRing and ui.outputQualityRing.texture == "Interface\\Minimap\\MiniMap-TrackingBorder",
   "known crafted-item quality adds a circular border")
+same(ui.outputQualityRing.point[1], "TOPLEFT",
+  "tracking-border art is aligned from the item icon's top-left, as in the native UI")
+same(ui.outputQualityRing.point[2], ui.outputItemButton,
+  "quality border is anchored to its own output item icon")
+same(ui.outputQualityRing.w, 68,
+  "quality border scales the native 52-to-32 art ratio for the 42-pixel item icon")
 assert(ui.outputQualityRing.vertexColor[2] > ui.outputQualityRing.vertexColor[1],
   "uncommon crafted-item ring is green")
 assert(ui.outputItemTitle.textColor[2] > ui.outputItemTitle.textColor[1],

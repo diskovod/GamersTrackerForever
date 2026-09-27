@@ -646,7 +646,9 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
   if qualityR then
     local ring = outputButton:CreateTexture(nil, "OVERLAY")
     ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    ring:SetSize(58, 58); ring:SetPoint("CENTER", outputButton, "CENTER", 0, 0)
+    -- This texture's circular artwork is offset inside its bounds. Blizzard's
+    -- 52px border sits TOPLEFT on a 32px button; retain that ratio for 42px.
+    ring:SetSize(68, 68); ring:SetPoint("TOPLEFT", outputButton, "TOPLEFT", 0, 0)
     if type(ring.SetVertexColor) == "function" then
       ring:SetVertexColor(qualityR, qualityG, qualityB, 1)
     end

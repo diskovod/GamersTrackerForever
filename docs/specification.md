@@ -2,7 +2,7 @@
 
 **Version:** 1.4 (search-only recipe browsing and header styling)
 
-**Status:** Implemented in 0.3.0-beta.18; client acceptance remains partial
+**Status:** Implemented in 0.3.0-beta.19; client acceptance remains partial
 
 **Updated:** 2026-09-27
 
