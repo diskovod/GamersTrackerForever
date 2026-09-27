@@ -3,10 +3,11 @@ GamersTrackerForever = GamersTrackerForever or {}
 local GTF = GamersTrackerForever
 
 GTF.ADDON_NAME = "GamersTrackerForever"
-GTF.ADDON_VERSION = "0.2.1"
+GTF.ADDON_VERSION = "0.3.0"
 GTF.SCHEMA_VERSION = 1
 GTF.DATA_VERSION = 1
 GTF.PRODUCT_CLASSIC_ERA = "classic_era"
+GTF.PRODUCT_FOREVER = "forever"
 -- Blizzard resolves these globals when Bindings.xml is loaded. Keep the
 -- machine-readable names stable while presenting readable key-bind labels.
 GTF.BINDING_HEADER = "GAMERSTRACKERFOREVER"
@@ -38,6 +39,9 @@ GTF.EVENTS = {
   "TRADE_SKILL_SHOW",
   "TRADE_SKILL_UPDATE",
   "TRADE_SKILL_CLOSE",
+  "CRAFT_SHOW",
+  "CRAFT_UPDATE",
+  "CRAFT_CLOSE",
   "BAG_UPDATE_DELAYED",
   "BAG_UPDATE",
   "BANKFRAME_OPENED",

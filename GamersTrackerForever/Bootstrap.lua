@@ -84,7 +84,7 @@ function GTF:GetStatusLines()
     "product " .. tostring(client.product) .. ", client " .. tostring(client.version ~= "" and client.version or "unknown")
       .. ", build " .. tostring(client.build ~= "" and client.build or "unknown")
       .. ", interface " .. tostring(client.interface),
-    "API adapter " .. tostring(self.product == self.PRODUCT_CLASSIC_ERA and "Classic" or "unsupported") .. ", current key " .. tostring(context and context.key or "unknown"),
+    "API adapter " .. tostring(({ [self.PRODUCT_CLASSIC_ERA] = "Classic", [self.PRODUCT_FOREVER] = "Forever" })[self.product] or "unsupported") .. ", current key " .. tostring(context and context.key or "unknown"),
     "transfer ecosystem " .. tostring(context and context.transferGroup or "unknown"),
     "last character scan " .. tostring(self.Runtime and self.Runtime.lastContextEvent and (self.Runtime.lastContextEvent .. " at " .. tostring(self.Runtime.lastContextAt or "unknown")) or "not scanned"),
     "last profession scan " .. tostring(professionAt or "not scanned")
@@ -126,8 +126,7 @@ function GTF:Initialize()
   end
   self.Runtime = { scans = {}, lastError = nil }
   self.Api, self.product = self.ApiCompat.Detect(_G)
-  local supportedProduct = self.product == self.PRODUCT_CLASSIC_ERA
-    and type(self.Api.IsSupported) == "function" and self.Api:IsSupported()
+  local supportedProduct = type(self.Api.IsSupported) == "function" and self.Api:IsSupported()
   self.Repository = self.Repository:Create(_G)
   self.Repository:Initialize(_G.GamersTrackerForeverDB, self.Api)
   if not supportedProduct and type(self.Repository.SetReadOnly) == "function" then
@@ -179,7 +178,7 @@ function GTF:Initialize()
     })
     self.Professions:Initialize(self.Api, self.Repository)
     if self.Characters and self.Characters.SetProfessionScanner then self.Characters:SetProfessionScanner(self.Professions) end
-    for _, event in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "TRADE_SKILL_CLOSE", "PLAYER_LOGOUT" }) do
+    for _, event in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "TRADE_SKILL_CLOSE", "CRAFT_SHOW", "CRAFT_UPDATE", "CRAFT_CLOSE", "PLAYER_LOGOUT" }) do
       local eventName = event
       self.Dispatcher:On(eventName, function(...)
         local ok, result = pcall(self.Professions.HandleEvent, self.Professions, eventName, ...)
@@ -216,7 +215,7 @@ function GTF:Initialize()
     if self.UI and type(self.UI.Refresh) == "function" then self.UI:Refresh() end
   end
   for _, event in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_LEVEL_UP", "SKILL_LINES_CHANGED", "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "TRADE_SKILL_CLOSE",
-    "BAG_UPDATE_DELAYED", "BANKFRAME_OPENED", "PLAYERBANKSLOTS_CHANGED", "BANKFRAME_CLOSED" }) do
+    "CRAFT_SHOW", "CRAFT_UPDATE", "CRAFT_CLOSE", "BAG_UPDATE_DELAYED", "BANKFRAME_OPENED", "PLAYERBANKSLOTS_CHANGED", "BANKFRAME_CLOSED" }) do
     self.Dispatcher:On(event, refreshUI)
   end
   if self.Characters and self.Characters.StartReconciliation then self.Characters:StartReconciliation() end

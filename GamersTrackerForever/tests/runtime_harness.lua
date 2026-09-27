@@ -103,7 +103,7 @@ SlashCmdList.GAMERSTRACKERFOREVER("status")
 assert(#messages > 0)
 SlashCmdList.GAMERSTRACKERFOREVER("probe")
 assert(GamersTrackerForever.BetaProbe and GamersTrackerForever.BetaProbe.lastResult)
-assert(messages[1]:match("version 0.2.1"))
+assert(messages[1]:match("version 0.3.0"))
 local foundUnsupported = false
 local foundSkippedEvent = false
 for _, message in ipairs(messages) do

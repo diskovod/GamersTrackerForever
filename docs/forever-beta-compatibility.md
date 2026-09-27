@@ -3,6 +3,15 @@
 Date: 2026-09-20  
 Scope: read-only inspection of the installed client at `C:\Program Files (x86)\World of Warcraft\_classic_beta_` and the addon source under `GamersTrackerForever\GamersTrackerForever`.
 
+## Update (0.3.0)
+
+`1.60.x` clients now select a dedicated Forever adapter (`ApiCompat.Forever`)
+that inherits the Classic API surface, writes to the `forever` product
+partition, uses GUID keys with a realmless `forever|region|ruleset|faction`
+transfer group, and detects Hardcore through `C_GameRules.IsHardcoreActive`.
+The TOC also lists interface `16001`. The checklist below remains the
+in-client gate; unknown client families still fail closed.
+
 ## Executive result
 
 The installed client is a real `wow_classic_beta` build, not the Classic Era build that the addon currently declares. The client reports version `1.60.1.69913` / build `69913`, branch `1.60.1`, while the addon TOC declares interface `11509` and product `Classic Era`. This is an **unreleased/test-only integration** until the addon has a beta-specific product/interface policy and has been loaded in this client.

@@ -176,6 +176,74 @@ function ApiCompat.CreateClassic(env, productKey)
   return adapter
 end
 
+-- WoW: Forever reports the 1.60.x client family and keeps the Classic
+-- profession/container API surface, so it reuses the Classic adapter.  It is
+-- realmless with region-unique two-part names; transfer ecosystems are split
+-- by region, ruleset (Hardcore vs normal), and faction instead of realm.
+local Forever = setmetatable({}, { __index = Classic })
+Forever.__index = Forever
+
+local function isForeverClient(env)
+  if not hasFunction(env, "GetBuildInfo") then
+    return false
+  end
+  local version = env.GetBuildInfo()
+  return type(version) == "string" and version:match("^1%.60%.[0-9]+") ~= nil
+end
+
+function Forever:GetCurrentIdentity()
+  local identity = Classic.GetCurrentIdentity(self)
+  local env = self.env
+  -- UnitFullName's second return is the name suffix on realmless Forever.
+  if identity.realm and identity.realm ~= "" and identity.displayName ~= "" then
+    identity.displayName = identity.displayName .. "-" .. tostring(identity.realm)
+  end
+  identity.realm = nil
+  if hasFunction(env, "GetCurrentRegion") then
+    identity.region = env.GetCurrentRegion()
+  end
+  local hardcore = type(env.C_GameRules) == "table" and hasFunction(env.C_GameRules, "IsHardcoreActive")
+    and env.C_GameRules.IsHardcoreActive() == true
+  identity.ruleset = hardcore and "hardcore" or "normal"
+  return identity
+end
+
+function Forever:GetCharacterKey(identity)
+  identity = identity or self:GetCurrentIdentity()
+  if identity.guid and identity.guid ~= "" then
+    return identity.guid
+  end
+  return table.concat({
+    GTF.PRODUCT_FOREVER,
+    normalize(identity.region),
+    normalize(identity.ruleset),
+    normalize(identity.displayName),
+    normalize(identity.faction),
+  }, "|")
+end
+
+function Forever:GetTransferGroup(identity)
+  identity = identity or self:GetCurrentIdentity()
+  return table.concat({
+    GTF.PRODUCT_FOREVER,
+    normalize(identity.region),
+    normalize(identity.ruleset),
+    normalize(identity.faction),
+  }, "|")
+end
+
+function Forever:GetCapabilities()
+  local capabilities = Classic.GetCapabilities(self)
+  capabilities[GTF.CAPABILITY.TRANSFER_GROUP] = hasFunction(self.env, "UnitFactionGroup")
+  return capabilities
+end
+
+function ApiCompat.CreateForever(env)
+  local adapter = setmetatable({ env = env or _G, productKey = GTF.PRODUCT_FOREVER }, Forever)
+  adapter.clientInfo = adapter:ReadClientInfo()
+  return adapter
+end
+
 local Unsupported = {}
 Unsupported.__index = Unsupported
 
@@ -239,12 +307,15 @@ function ApiCompat.Detect(env)
   if isClassic then
     return ApiCompat.CreateClassic(env), GTF.PRODUCT_CLASSIC_ERA
   end
-  -- The Classic .toc is not a Forever adapter. Keep the probe useful while
-  -- making an unvalidated product visible.  Never return the Classic adapter
-  -- for an unverified build, even when a beta reuses project id 2.
+  if isForeverClient(env) then
+    return ApiCompat.CreateForever(env), GTF.PRODUCT_FOREVER
+  end
+  -- Keep the probe useful while making an unknown product visible.  Never
+  -- return a scanning adapter for an unrecognized client family.
   local productKey = "unsupported:" .. tostring(projectID or "unknown")
   return ApiCompat.CreateUnsupported(env, productKey), productKey
 end
 
 GTF.ApiCompat.Classic = Classic
+GTF.ApiCompat.Forever = Forever
 GTF.ApiCompat.Unsupported = Unsupported

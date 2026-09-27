@@ -1,6 +1,6 @@
 # GamersTrackerForever
 
-GamersTrackerForever is a Classic Era MVP: an account-wide, last-known tracker
+GamersTrackerForever is a Classic Era and WoW Forever addon: an account-wide, last-known tracker
 for character levels, professions,
 learned recipes, bags, banks, and cross-character crafting materials.
 
@@ -11,10 +11,9 @@ overview/recipes pane on the right. Its `Track up to` control supports 1–10
 characters (default 3) and never silently untracks existing characters.
 
 The addon is informational. It does not move items, automate protected actions,
-or contact an external service. The installed Forever beta has been identified
-as `wow_classic_beta` build `1.60.1.69913`; it remains diagnostic-only until
-`/gtf probe` supplies the runtime interface and API evidence required by the
-compatibility gate.
+or contact an external service. WoW Forever `1.60.x` clients use a dedicated
+realmless adapter with its own data partition; see
+[installation](docs/installation.md) for the remaining in-client gate.
 
 Snapshots are stored locally in the account-wide `GamersTrackerForeverDB`
 SavedVariables table. WoW serializes it on `/reload`, logout, clean exit, or
@@ -28,6 +27,7 @@ Copy the [`GamersTrackerForever`](GamersTrackerForever) directory to:
 
 ```text
 World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\
+World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\   (WoW Forever)
 ```
 
 Enable **GamersTrackerForever** on the character-selection AddOns screen, then use
@@ -52,5 +52,4 @@ Enable **GamersTrackerForever** on the character-selection AddOns screen, then u
 The supported manifest targets Classic Era/SoD interface `11509`, confirmed
 from the locally installed client metadata. All eight Lua fixture harnesses,
 the SoD XML regression, and diff validation pass locally. In-client acceptance
-still requires launching the relevant game client; the Forever beta is not yet
-declared compatible.
+still requires launching the relevant game client.
