@@ -2,7 +2,7 @@
 ## Title: GamersTrackerForever
 ## Notes: Last-known professions, recipes, and material snapshots for your characters.
 ## Author: GamersTrackerForever
-## Version: 0.3.0-beta.12
+## Version: 0.3.0-beta.13
 ## SavedVariables: GamersTrackerForeverDB AltCraftTrackerDB
 ## X-Product: Classic Era, WoW Forever beta
 ## X-Data-Version: 1
@@ -22,6 +22,8 @@ ForeverRecipeScanner.lua
 CraftabilityService.lua
 RecipeCatalog.lua
 ViewModels.lua
+ClassIcons.lua
+ItemUsability.lua
 UI.lua
 MinimapButton.lua
 SlashCommands.lua

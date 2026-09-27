@@ -29,6 +29,28 @@ local function call(owner, method, ...)
   return value
 end
 
+-- Category metadata is decorative: an unavailable lookup must never reject an
+-- otherwise complete learned-recipe snapshot. Walk parent IDs for native
+-- category/subcategory hierarchy, guarding malformed cycles and deep chains.
+local function categoryFor(owner, id)
+  local path, seen = {}, {}
+  local leafName = nil
+  local current = positive(id)
+  if not current then return nil, nil end
+  for _ = 1, 8 do
+    if not current or seen[current] then break end
+    seen[current] = true
+    local info = call(owner, "GetCategoryInfo", current)
+    if type(info) ~= "table" then break end
+    local name = type(info.name) == "string" and info.name or nil
+    if not name or name == "" then break end
+    leafName = leafName or name
+    table.insert(path, 1, name)
+    current = positive(info.parentCategoryID)
+  end
+  return leafName, #path > 0 and path or nil
+end
+
 function Scanner:Create(env, api, repository, rankScanner, options)
   options = type(options) == "table" and options or {}
   return setmetatable({
@@ -106,10 +128,13 @@ function Scanner:_collect(scanAt)
         end
         table.sort(reagents, function(a, b) return a.itemID < b.itemID end)
         local recipeKey = "recipe:" .. tostring(id)
+        local categoryName, categoryPath = categoryFor(owner, info.categoryID)
         recipes[recipeKey] = {
           success = true, complete = true, recipeID = id,
           professionID = professionID, professionName = professionName,
           name = info.name, icon = info.icon or 0,
+          categoryID = positive(info.categoryID),
+          categoryName = categoryName, categoryPath = categoryPath,
           outputItemID = schematic.outputItemID,
           outputMin = schematic.quantityMin, outputMax = schematic.quantityMax,
           reagents = reagents, specialRequirements = {},

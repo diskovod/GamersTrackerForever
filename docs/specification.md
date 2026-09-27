@@ -1,21 +1,21 @@
-# GamersTrackerForever — Final Addon Specification
+# GamersTrackerForever — Addon Specification
 
-**Version:** 1.0
+**Version:** 1.1 (UI and automatic-tracking revision)
 
-**Status:** Final for implementation
+**Status:** Implemented in 0.3.0-beta.13; client acceptance remains partial
 
-**Prepared:** 2026-09-15
+**Updated:** 2026-09-27
 
-**Initial platform:** WoW Classic Era
+**Platforms:** WoW Classic Era and World of Warcraft: Forever beta
 
-**Second platform:** World of Warcraft: Forever, after beta API validation
+**Storage scope:** One local WoW installation/account-wide SavedVariables file; no server yet
 
 ## 1. Product definition
 
-GamersTrackerForever is a compact World of Warcraft addon that records the last-known state of selected characters and answers two questions:
+GamersTrackerForever is a compact World of Warcraft addon that records the last-known state of every character that has run it in the local WoW installation and answers two questions:
 
-1. Which professions and recipes does each tracked character have?
-2. For a selected recipe, which tracked characters hold the required materials, and is the pooled amount sufficient?
+1. Which professions, native recipe categories, and learned recipes does each discovered character have?
+2. For a selected recipe, which discovered characters hold the required materials, and is the pooled amount sufficient?
 
 The addon tracks:
 
@@ -30,7 +30,7 @@ Quest and questline tracking is explicitly excluded from this version.
 
 ## 2. Feasibility decision
 
-The addon is feasible on WoW Classic Era.
+The addon is feasible on WoW Classic Era. The Forever beta client has also been probed and partially validated; support is capability-based rather than inferred from its interface number alone.
 
 - The logged-in character's identity, level, skills, professions, recipes, bags, and accessible bank contents can be read through addon APIs.
 - Other characters cannot be queried while offline. Their information is a last-known snapshot collected when each character was played.
@@ -44,7 +44,7 @@ The local Classic Era installation and installed BagBrother/Bagnon source demons
 
 ## 3. WoW: Forever compatibility position
 
-World of Warcraft: Forever beta begins September 17, 2026. Blizzard has not yet published its addon interface number, API flavor, project constant, or compatibility guarantees.
+The locally tested Forever beta client reports version `1.60.1`, interface `16001`, project `1`, and build `70009` in the latest probe. Earlier beta builds differed, so the adapter must remain capability-based. The beta has provided character identity, profession ranks, 44/44 readable bag slots, and `C_TradeSkillUI` learned-recipe IDs, learned state, output items, and reagent schematics when a profession window is open. Bank access and transfer boundaries remain unverified or unsupported by this build.
 
 The product announcements do establish several requirements:
 
@@ -55,33 +55,35 @@ The product announcements do establish several requirements:
 
 Sources: Blizzard's [Forever announcement](https://news.blizzard.com/en-us/article/24302093/carve-a-new-path-with-world-of-warcraft-forever), [What's Next recap](https://worldofwarcraft.blizzard.com/en-us/news/24303862/world-of-warcraft-forever-whats-next-panel-recap), and [Deep Dive recap](https://worldofwarcraft.blizzard.com/en-us/news/24303313).
 
-The core must therefore be client-neutral. All version-sensitive calls belong behind an API adapter, and Classic and Forever data must occupy separate product namespaces. Forever support is accepted only after the beta validation suite passes.
+The core must remain client-neutral. All version-sensitive calls belong behind an API adapter, and Classic and Forever data occupy separate product namespaces. A successful probe of one capability is not a blanket support claim for all Forever APIs.
 
 ## 4. Product scope
 
 ### 4.1 MVP features
 
 - Discover the current character on login.
-- Allow the user to track or untrack discovered characters.
-- Display each tracked character's name, level, class, faction, product, transfer ecosystem, and last-seen time.
+- Automatically include every character that runs the addon; no character-count limit or manual track/untrack state.
+- Display each discovered character's name, level, small class icon, faction, product, transfer ecosystem, and last-seen time.
 - Record primary and secondary professions with current and maximum skill values.
-- Scan learned recipes and reagent requirements when a profession is opened.
+- Scan learned recipes, native profession categories when exposed, and reagent requirements when a profession is opened.
 - Record bag contents from bag events.
 - Record bank contents while the bank is open and preserve the last-known snapshot afterward.
-- List recipes known by one or more tracked characters.
+- List recipes known by one or more discovered characters.
 - Display which characters know a selected recipe.
 - Display required materials with bag, bank, per-character, pooled, and shortage totals.
 - Indicate stale, missing, and never-scanned data.
 - Store everything locally in account-wide SavedVariables.
 - Provide a compact, expandable Blizzard-style UI.
-- Use a persistent two-pane native UI: a left character selector and a larger
-  right detail/recipes pane. The selected character expands into professions
-  with ranks, and each profession expands into its captured recipes. Selecting
-  a recipe shows icon-and-quantity material cards above a separate per-character
-  holdings panel. Raw bag item-ID lists are not part of the character overview.
-  The selector exposes a `Track up to` limit from 1 through 10 (default 3),
-  persists the selected character, and never silently untracks existing
-  characters when a limit is reached.
+- Use a persistent two-pane native UI: a searchable, scrollable left tree and
+  a larger right detail pane. The tree is Character > Profession > Category >
+  learned Recipe; profession ranks and recipe categories are collapsible. A
+  category is omitted or labeled as uncategorized when the client supplies no
+  reliable category data. Selecting a recipe shows output-item and reagent
+  icons with native item tooltips above a separate per-character holdings panel.
+  Raw bag item-ID lists are not part of the character overview. There is no
+  `Characters` tab button or `Track up to` selector. A red cross beside an
+  equippable output indicates a *confirmed* class/type mismatch for the
+  currently logged-in character; unknown usability is not shown as unusable.
 
 ### 4.2 Out of scope
 
@@ -90,7 +92,7 @@ The core must therefore be client-neutral. All version-sensitive calls belong be
 - Cloud or server synchronization.
 - Synchronization across computers or separate WoW account folders.
 - Live Wowhead or other website requests.
-- A complete catalog of recipes no tracked character knows.
+- A complete catalog of recipes no discovered character knows.
 - Recipe source/drop/vendor guidance.
 - Auction house, mailbox, guild bank, and equipped-item counts.
 - Price calculations.
@@ -100,19 +102,20 @@ The core must therefore be client-neutral. All version-sensitive calls belong be
 ## 5. Terminology
 
 - **Discovered character:** a character that has loaded the addon at least once.
-- **Tracked character:** a discovered character included in the addon UI and material calculations.
+- **Included character:** a discovered character automatically included in the UI and material calculations. Older `tracked` save fields are migrated to this behavior.
 - **Current character:** the character presently logged in.
 - **Snapshot:** last data collected for one character and one data source.
 - **Fresh data:** data collected within its configured freshness threshold.
 - **Transfer ecosystem:** characters between which the addon may reasonably assume items can be moved.
-- **Known recipe:** a recipe captured from a tracked character's profession UI.
-- **Pooled materials:** the sum of eligible last-known item counts across compatible tracked characters.
+- **Known recipe:** a recipe captured from a discovered character's profession UI.
+- **Native recipe category:** a profession-UI section associated with a learned recipe when the client exposes it. Category names are presentation data, not recipe identity.
+- **Pooled materials:** the sum of eligible last-known item counts across compatible included characters.
 - **Craftable now:** the current character has the materials available to the game immediately.
-- **Craftable after transfer:** compatible tracked characters collectively have enough last-known materials.
+- **Craftable after transfer:** compatible included characters collectively have enough last-known materials.
 
 ## 6. Functional requirements
 
-### FR-1: Character discovery and tracking
+### FR-1: Character discovery and automatic inclusion
 
 On login, the addon shall create or update the current character record.
 
@@ -126,13 +129,13 @@ The record shall contain:
 - current level;
 - game product and client build;
 - last-seen timestamp;
-- tracked/untracked state.
+- automatic inclusion in this installation's local database.
 
-The UI shall let the user:
-
-- track or untrack the current/discovered character;
-- hide an untracked character;
-- permanently forget a character and its snapshots through an explicit confirmation.
+Every valid previously saved character shall remain visible, including records
+that an older release marked untracked. Migration shall not erase their
+profession, recipe, or inventory snapshots. There is no count cap. The UI may
+offer an explicitly confirmed **Forget** operation for an obsolete local
+record; logging back into that character discovers it again.
 
 The addon shall not claim to enumerate characters that have never loaded it. Manual empty placeholders are not part of MVP.
 
@@ -173,6 +176,7 @@ For each recipe, capture when exposed:
 - recipe or spell ID;
 - localized name and icon;
 - profession ID;
+- native category ID/name or hierarchy, when reliably exposed;
 - output item ID/link;
 - minimum and maximum output quantity;
 - reagent item IDs and required quantities;
@@ -188,6 +192,9 @@ Rules:
 - Replace the learned set for the scanned profession atomically after a successful complete scan.
 - Preserve the previous valid snapshot if a scan fails or the profession data source is incomplete.
 - Mark a profession `stale` after a client/addon data-version change until it is opened again.
+- Preserve captured category metadata in the product-level recipe definition;
+  old recipes without category data remain valid and appear under an
+  uncategorized section rather than being assigned a guessed category.
 
 ### FR-5: Inventory scanning
 
@@ -218,13 +225,16 @@ readable slots.
 
 ### FR-6: Recipe catalog
 
-The MVP catalog shall contain recipes learned by at least one tracked character and captured from the game client.
+The MVP catalog shall contain recipes learned by at least one discovered character and captured from the game client.
 
 Recipe definitions shall be deduplicated at product level. Characters shall store only the set of recipe IDs they know.
 
 The recipe browser shall support:
 
-- text search by recipe/output name;
+- left-tree text search across character, profession, category, and recipe
+  names, case-insensitively; matching descendants reveal their ancestors
+  without permanently changing the user's expansion choices;
+- catalog text search by recipe/output name;
 - profession filter;
 - known-by-character filter;
 - craftable/shortage filter;
@@ -242,19 +252,24 @@ For every reagent, show:
 - item icon and localized name;
 - quantity required per craft;
 - current-character bag quantity;
-- each tracked character's bag quantity;
-- each tracked character's last-known bank quantity;
+- each included character's bag quantity;
+- each included character's last-known bank quantity;
 - pooled compatible total;
 - shortage;
 - snapshot age;
 - status: `ready`, `short`, `stale`, `unknown`, or `special requirement`.
 
-Every tracked character shall be represented, including zero values and characters with missing scans.
+Every discovered character shall be represented, including zero values and characters with missing scans.
+
+Hovering the crafted-item icon, recipe row, or reagent card shall use the
+client's native item tooltip positioned beside the hovered item. Equipped-item
+comparison may appear when the client supports it. A missing item cache must
+not fabricate tooltip data.
 
 The panel shall distinguish:
 
 1. **Available now:** materials immediately usable by the current character.
-2. **Available after transfer:** pooled materials belonging to compatible tracked characters.
+2. **Available after transfer:** pooled materials belonging to compatible included characters.
 3. **Incompatible/isolated:** materials on characters outside the selected transfer ecosystem.
 
 ### FR-8: Craftability calculation
@@ -264,7 +279,7 @@ For fixed ordinary reagents:
 ```text
 availableNowOwned(item) = currentCharacterBagCount(item)
 characterTransferableOwned(item) = bagCount(item) + lastKnownBankCount(item)
-pooledAfterTransferOwned(item) = sum(characterTransferableOwned(item)) for compatible tracked characters
+pooledAfterTransferOwned(item) = sum(characterTransferableOwned(item)) for compatible included characters
 shortage(item) = max(required(item) - selectedViewOwned(item), 0)
 craftableCount = min(floor(selectedViewOwned(item) / required(item))) across reagents
 ```
@@ -302,7 +317,7 @@ The thresholds shall be configurable. Stale values may contribute to a pooled to
 - detected API adapter;
 - current character key and transfer ecosystem;
 - last character, profession, bag, and bank scans;
-- total tracked characters and cached recipes;
+- total included characters and cached recipes;
 - unsupported capabilities or last scanner error.
 
 Diagnostics must not expose private account paths or unrelated SavedVariables.
@@ -339,7 +354,6 @@ GamersTrackerForeverDB = {
   settings = {
     staleAfterSeconds = 86400,
     veryStaleAfterSeconds = 604800,
-    maxTrackedCharacters = 3,
     selectedCharacterKey = nil,
   },
   products = {
@@ -351,6 +365,9 @@ GamersTrackerForeverDB = {
           professionID = 0,
           name = "",
           icon = 0,
+          categoryID = nil,
+          categoryName = nil,
+          categoryPath = nil,
           outputItemID = 0,
           outputMin = 1,
           outputMax = 1,
@@ -362,7 +379,7 @@ GamersTrackerForeverDB = {
       },
       characters = {
         [characterKey] = {
-          tracked = true,
+          tracked = true, -- legacy compatibility field; every valid character is included
           identity = {
             guid = "",
             displayName = "",
@@ -454,47 +471,50 @@ are not available to WoW addons.
 - Optional key binding.
 - Window is movable, resizable, clamped to screen, and remembers its geometry.
 
-### 9.2 Characters tab
+### 9.2 Main two-pane view
 
-The tab is a persistent two-pane layout. The left pane always lists every
-discovered character, marks the selected row, and shows tracked/available
-status. It includes the native `Track up to` dropdown. The right pane shows the
-selected character overview (or a helpful no-selection message), profession
-rows, scan freshness, and sorted saved bag/bank item rows with item IDs and
-counts. Selecting a row updates `settings.selectedCharacterKey`.
-
-Collapsed row:
-
-```text
-[Class] Ana Forever   L42   Alchemy 225 | Herbalism 210   seen 12m ago   [>]
-```
-
-Expanded content:
-
-- identity/product/transfer ecosystem;
-- level and last seen;
-- profession rows with rank and recipe scan status;
-- bag and bank scan freshness;
-- track/untrack and forget controls.
-
-### 9.3 Recipes tab
-
-Recipe row:
+There is no `Characters` tab. The left pane is always available and begins
+with a search field and clear control, followed by every locally discovered
+character. Each character row shows its full name, level, and a small class
+icon when a known class ID is saved. The row expands into profession headers
+with `rank/maxRank`, native recipe category headers, and learned recipe rows.
+Category and profession headers are collapsible. The currently selected recipe
+is visually distinct; unknown class icons and categories are omitted or use a
+plain uncategorized label rather than a guessed value. The left list scrolls
+independently of the larger right detail pane.
 
 ```text
-[Icon] Heavy Copper Maul   Blacksmithing   Known: Brinna   Transfer-ready: 1
+Search [Copper                       ×]
+▾ Disko Lebowski  L20                 [Paladin icon]
+    ▾ Blacksmithing 53/75
+        ▾ Mail Legguards
+            • Copper Chain Pants
 ```
 
-Controls:
+Search is case-insensitive across character, profession, category, and recipe
+names. When a descendant matches, its ancestors stay visible and expand for
+the filtered view without destroying the prior expansion state. Clearing the
+query restores the previous tree. Selecting a recipe shows its output item,
+profession, materials, craftability summary, and per-character holdings in
+the right pane. The character overview shows identity, level, freshness, and
+professions, but no raw bag item-ID dump or Track/Untrack button. `Forget`
+remains an explicit, confirmed cleanup action.
 
-- search field;
-- profession filter;
-- character filter;
-- craftable/shortage filter;
-- transfer ecosystem filter;
-- expandable recipe details.
+### 9.3 All Recipes view
 
-### 9.4 Material panel
+The optional `All Recipes` header button opens the existing catalog/search
+view; it does not replace the persistent left character tree. Selecting a
+character, profession, or recipe returns to the corresponding detail view.
+Catalog controls retain recipe search and filters for profession, character,
+craftability/shortage, and transfer ecosystem where supported.
+
+### 9.4 Recipe detail, material panel, and item hints
+
+The output item and each material are displayed with an icon and native WoW
+tooltip on hover, positioned beside the hovered item. When available, the
+client's equipped-item comparison is allowed to appear. Hovering a character
+holding shows the location and scan age behind its quantity. The material
+panel remains separate from the item detail:
 
 ```text
 Heavy Copper Maul — known by Brinna
@@ -504,7 +524,11 @@ Copper Bar       20      24   4 bags             20 bank (2h)     Ready
 Weak Flux         2       —   Vendor/special      —                Buy 2
 ```
 
-Hovering a quantity shall show its character, location, exact scan time, and whether it is included in the pooled total.
+For an equippable output, show a small red cross by the recipe name **only**
+when item classification and the *currently logged-in* character's class
+confirm a permanent armor/weapon-type incompatibility. Do not use a red cross
+for a level requirement, uncached item, unknown beta-specific rule, or missing
+class data. This is a conservative hint, not a replacement for WoW's tooltip.
 
 ## 10. Architecture
 
@@ -518,6 +542,7 @@ Bootstrap
   -> RecipeCatalog
   -> CraftabilityService
   -> ViewModels
+  -> ClassIcons / ItemUsability
   -> UI
 ```
 
@@ -532,6 +557,9 @@ Responsibilities:
 - **RecipeCatalog:** deduplicated recipes discovered from clients.
 - **CraftabilityService:** pure calculations with no WoW API calls.
 - **ViewModels:** transforms data and freshness into UI-ready rows.
+- **ClassIcons:** maps saved class IDs to the client's classic class sprite.
+- **ItemUsability:** conservative item-class/subclass versus current-player
+  class decision; returns unknown rather than inventing a usability verdict.
 - **UI:** rendering and user interaction only.
 
 ## 11. Non-functional requirements
@@ -552,7 +580,8 @@ Responsibilities:
 ### Character and persistence
 
 - Login discovers character A and saves its level.
-- Tracking state survives `/reload` and logout.
+- Every valid previously saved character is included after `/reload`, even if
+  an older version marked it untracked; no `Track up to` cap is retained.
 - Login as character B preserves and displays character A.
 - Same-named Classic characters on different realms do not collide.
 - Classic and Forever records do not mix.
@@ -563,10 +592,19 @@ Responsibilities:
 - Profession names and ranks are visible after login.
 - An unopened profession displays `recipe scan required`.
 - Opening a profession captures every learned recipe exposed by the client.
+- Classic header rows and supported Forever recipe-category metadata are
+  persisted; missing category metadata does not block recipe capture.
+- The left tree shows Character > Profession > Category > Recipe, and a search
+  match reveals its ancestors without permanently expanding them.
 - Reagents and quantities are stored by item ID.
 - Learning a recipe and reopening/updating the profession adds it.
 - Abandoning a profession updates the profession state without corrupting the catalog.
 - A failed/incomplete scan does not erase the previous learned set.
+- A known Priest viewing a known mail-armor output sees a red cross; cloth or
+  uncached/unknown item data does not produce a false cross. The badge follows
+  the currently logged-in character, not the selected recipe crafter.
+- Recipe row, output icon, and reagent icon open native item tooltips beside
+  the hovered item; output equipment comparison remains available.
 
 ### Inventory
 
@@ -592,29 +630,37 @@ Responsibilities:
 - State survives clean logout and client restart.
 - A ten-minute reconciliation updates the in-memory timestamps without forcing a reload.
 - Corrupt fixture records are isolated without destroying healthy records.
-- Schema migration preserves tracked characters, recipes, and inventory.
+- Schema migration preserves all characters, recipes, and inventory, including
+  records that an older release marked untracked.
 
 ## 13. Forever beta release gate
 
-Before claiming Forever support:
+The local beta client is installed and the addon has loaded there. The
+compatibility probe has confirmed identity, profession ranks, bags, and
+learned-recipe/schematic data while the profession UI is open. The following
+full release gate still applies before claiming complete Forever support:
 
 1. Record install flavor, client build, interface number, project constants, and accepted `.toc` metadata.
 2. Confirm that third-party addons load.
 3. Verify GUID and complete two-part character-name APIs.
 4. Identify region, ruleset, faction, and Hardcore transfer boundaries.
 5. Verify profession enumeration before opening the profession UI.
-6. Open professions and identify exact learned-recipe, output, reagent, Blueprint, tool, and special-requirement APIs.
+6. Open professions and identify exact learned-recipe, output, reagent, Blueprint, tool, native-category, and special-requirement APIs. The ordinary learned-recipe path is validated; Blueprint and special cases still need representative tests.
 7. Verify bag and bank container IDs/events.
 8. Check for account-wide storage or new reagent locations.
 9. Verify account-wide SavedVariables from two beta characters.
 10. Scan representative new Forever recipes and compare recipe/item ID behavior with Classic.
 11. Run the full acceptance suite using the Forever adapter.
 
-If the beta client is installed locally, inspect it directly and use a minimal purpose-built probe addon. No third-party addon download is required for this gate.
+Keep unsupported bank, transfer, and special-recipe capabilities visibly
+unknown. No third-party addon download is required for this gate.
 
 ## 14. Development work packages
 
-Each work package is owned by exactly one development agent. Agents may not edit the same module concurrently. Integration begins only after a package meets its handoff tests.
+Tasks 1–8 below record the original implementation sequence. They are
+historical planning context, not an instruction to restore superseded UI
+controls. Each new UI revision task below is owned by one agent; shared UI
+files are edited sequentially and integrated after handoff tests.
 
 ### Task 1 — Addon scaffold and API capability probe
 
@@ -697,11 +743,11 @@ Owner: one Luna/high agent.
 Deliverables:
 
 - main window and saved geometry;
-- Characters tab;
-- Recipes tab and filters;
+- persistent character/profession/recipe tree and optional All Recipes view;
+- search and recipe filters;
 - material matrix;
 - freshness states and tooltips;
-- track/untrack/forget flows;
+- automatic character inclusion and confirmed Forget flow;
 - minimap button and key binding.
 
 Depends on: Tasks 2 and 5 public interfaces.
@@ -723,7 +769,7 @@ Depends on: Tasks 1–6.
 
 ### Task 8 — Forever beta adapter
 
-Owner: one Luna/high agent after the beta client is available.
+Owner: one agent after the beta client is available.
 
 Deliverables:
 
@@ -747,6 +793,28 @@ Task 1
 
 Task 8 starts when the beta client exists and the relevant core interfaces are stable.
 ```
+
+### Current UI revision tasks (2026-09-27)
+
+1. **Automatic inclusion:** remove the character cap and migrate old
+   untracked records to included without losing snapshots.
+2. **Left search:** place a search-and-clear field above the left tree;
+   matching recipe/category descendants reveal their ancestors temporarily.
+3. **Remove Characters button:** the character tree is the default view;
+   remove manual Track/Untrack controls, keep confirmed Forget.
+4. **Native categories and visual hierarchy:** preserve client-exposed recipe
+   categories, add collapsible category rows, and improve left-pane contrast,
+   spacing, selection, and scrolling.
+5. **Class icon:** show a compact icon after each known character name from
+   saved class ID, with a safe fallback for unknown/custom classes.
+6. **Cannot-wear hint:** show a red cross for a *confirmed* permanent
+   item-class/subclass mismatch with the currently logged-in character; never
+   infer incompatibility from missing cache, level, or unknown beta rules.
+
+Each task requires a focused fixture test. The integrated build must pass all
+Lua harnesses, load in the Forever beta without a Lua error, survive `/reload`,
+and show the intended tree, category, tooltip, and item badge behavior. Live
+Forever bank and transfer support remain outside this UI revision.
 
 ## 15. Definition of done
 

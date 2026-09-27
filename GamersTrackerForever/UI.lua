@@ -120,6 +120,14 @@ local function setIcon(texture, value)
   end
 end
 
+local function wearabilityMarker(self, recipe)
+  local usability = GTF.ItemUsability
+  if type(recipe) ~= "table" or not usability
+    or type(usability.GetStatusForCurrentPlayer) ~= "function" then return "" end
+  local status = usability.GetStatusForCurrentPlayer(self.env, recipe.outputItemID)
+  return status == "unwearable" and " |cffff4040×|r" or ""
+end
+
 local function attachItemTooltip(self, frame, itemID, itemLink, iconInset)
   itemID = tonumber(itemID)
   if not itemID or itemID <= 0 then return end
@@ -167,7 +175,7 @@ function UI:Create(options)
     api = options.api, productKey = options.productKey, getGeometry = options.getGeometry, setGeometry = options.setGeometry,
     professionsSupported = options.professionsSupported ~= false,
     recipesSupported = options.recipesSupported ~= false,
-    expandedCharacters = {}, expandedProfessions = {}, expandedRecipes = {}, tab = "characters", rows = {}, recipeRows = {}, initialized = false,
+    expandedCharacters = {}, expandedProfessions = {}, expandedCategories = {}, expandedRecipes = {}, tab = "characters", rows = {}, recipeRows = {}, initialized = false,
     selectedCharacterKey = options.selectedCharacterKey, selectedProfessionKey = nil, selectedRecipeKey = nil,
     statusMessage = nil }, UI)
   return self
@@ -196,13 +204,13 @@ function UI:Initialize(dependencies)
   frame:SetMovable(true)
   frame:EnableMouse(true)
   frame:SetResizable(true)
-  if type(frame.SetResizeBounds) == "function" then frame:SetResizeBounds(760, 400, 1100, 800)
-  elseif type(frame.SetMinResize) == "function" then frame:SetMinResize(760, 400) end
+  if type(frame.SetResizeBounds) == "function" then frame:SetResizeBounds(850, 400, 1100, 800)
+  elseif type(frame.SetMinResize) == "function" then frame:SetMinResize(850, 400) end
   createBackdrop(frame)
   local saved = geometry(self)
   frame:ClearAllPoints()
   frame:SetPoint(saved.point or "CENTER", UIParent, saved.relative or "CENTER", tonumber(saved.x) or 0, tonumber(saved.y) or 0)
-  frame:SetSize(math.max(760, tonumber(saved.width) or 900), math.max(400, tonumber(saved.height) or 560))
+  frame:SetSize(math.max(850, tonumber(saved.width) or 900), math.max(400, tonumber(saved.height) or 560))
   frame:RegisterForDrag("LeftButton")
   frame:SetScript("OnDragStart", function(f) f:StartMoving() end)
   frame:SetScript("OnDragStop", function(f) f:StopMovingOrSizing(); saveGeometry(self) end)
@@ -216,83 +224,49 @@ function UI:Initialize(dependencies)
   self.trackedHeader = label(frame, "GameFontNormal", "TOPLEFT", frame, 380, -15, 170, 20)
   self.close = button(frame, "Close", 70, 22); self.close:SetPoint("TOPRIGHT", -12, -10); self.close:SetScript("OnClick", function() self:Hide() end)
   self.tabs = {}
-  local charactersTab = button(frame, "Characters", 100, 24); charactersTab:SetPoint("TOPLEFT", 14, -42)
-  local recipesTab = button(frame, "Recipes", 100, 24); recipesTab:SetPoint("LEFT", charactersTab, "RIGHT", 4, 0)
-  self.tabs.characters, self.tabs.recipes = charactersTab, recipesTab
+  local recipesTab = button(frame, "All Recipes", 100, 24); recipesTab:SetPoint("TOPLEFT", 14, -42)
+  self.tabs.recipes = recipesTab
   if not self.recipesSupported then
     recipesTab:Hide()
   end
-  charactersTab:SetScript("OnClick", function() self.tab = "characters"; self:Refresh() end)
   recipesTab:SetScript("OnClick", function() self.tab = "recipes"; self:Refresh() end)
   self.body = CreateFrame("Frame", nil, frame); self.body:SetPoint("TOPLEFT", 10, -72); self.body:SetPoint("BOTTOMRIGHT", -10, 10)
-  self.leftPane = CreateFrame("Frame", nil, self.body); self.leftPane:SetPoint("TOPLEFT", 0, 0); self.leftPane:SetPoint("BOTTOMLEFT", 0, 0); self.leftPane:SetWidth(250)
-  self.leftTitle = label(self.leftPane, "GameFontNormal", "TOPLEFT", self.leftPane, 6, -4, 225, 20); self.leftTitle:SetText("Characters · Professions")
-  self.trackLimitLabel = label(self.leftPane, "GameFontNormalSmall", "TOPLEFT", self.leftPane, 6, -27, 82, 20); self.trackLimitLabel:SetText("Track up to")
-  self.trackLimitDropdown = CreateFrame("Frame", "GamersTrackerForeverTrackLimit", self.leftPane, "UIDropDownMenuTemplate")
-  self.trackLimitDropdown:SetPoint("TOPLEFT", 82, -20)
-  -- Classic/SoD use the frame-first UIDropDownMenu signatures.
-  if type(UIDropDownMenu_SetWidth) == "function" then UIDropDownMenu_SetWidth(self.trackLimitDropdown, 92) end
+  self.leftPane = CreateFrame("Frame", nil, self.body); self.leftPane:SetPoint("TOPLEFT", 0, 0); self.leftPane:SetPoint("BOTTOMLEFT", 0, 0); self.leftPane:SetWidth(286)
+  self.leftTitle = label(self.leftPane, "GameFontNormal", "TOPLEFT", self.leftPane, 6, -4, 262, 20); self.leftTitle:SetText("Characters · Professions")
+  label(self.leftPane, "GameFontNormalSmall", "TOPLEFT", self.leftPane, 6, -30, 42, 20):SetText("Search")
+  self.characterSearch = editBox(self.leftPane, 190, 22); self.characterSearch:SetPoint("TOPLEFT", 49, -27)
+  self.characterSearch:SetScript("OnTextChanged", function()
+    if self.characterScroll and type(self.characterScroll.SetVerticalScroll) == "function" then
+      self.characterScroll:SetVerticalScroll(0)
+    end
+    if self.initialized then self:RefreshCharacters(getProduct(self)) end
+  end)
+  self.characterSearch:SetScript("OnEscapePressed", function(box) box:ClearFocus() end)
+  self.characterSearchClear = button(self.leftPane, "X", 20, 22)
+  self.characterSearchClear:SetPoint("TOPLEFT", 244, -27)
+  self.characterSearchClear:SetScript("OnClick", function()
+    self.characterSearch:SetText("")
+    self.characterSearch:ClearFocus()
+    self:RefreshCharacters(getProduct(self))
+  end)
   self.characterScroll = CreateFrame("ScrollFrame", nil, self.leftPane, "UIPanelScrollFrameTemplate")
   self.characterScroll:SetPoint("TOPLEFT", 2, -54); self.characterScroll:SetPoint("BOTTOMRIGHT", -16, 0)
-  self.characterContent = CreateFrame("Frame", nil, self.characterScroll); self.characterContent:SetSize(228, 1); self.characterScroll:SetScrollChild(self.characterContent)
+  self.characterContent = CreateFrame("Frame", nil, self.characterScroll); self.characterContent:SetSize(264, 1); self.characterScroll:SetScrollChild(self.characterContent)
   self.rightPane = CreateFrame("Frame", nil, self.body); self.rightPane:SetPoint("TOPLEFT", self.leftPane, "TOPRIGHT", 8, 0); self.rightPane:SetPoint("BOTTOMRIGHT", 0, 0)
   self.detailScroll = CreateFrame("ScrollFrame", nil, self.rightPane, "UIPanelScrollFrameTemplate"); self.detailScroll:SetPoint("TOPLEFT", 2, 0); self.detailScroll:SetPoint("BOTTOMRIGHT", -16, 0)
   self.detailContent = CreateFrame("Frame", nil, self.detailScroll); self.detailContent:SetSize(500, 1); self.detailScroll:SetScrollChild(self.detailContent)
   self.recipeControls = CreateFrame("Frame", nil, self.rightPane)
-  -- Keep the filter row inside the right pane even at the 760px minimum.
+  -- Keep the filter row inside the right pane even at the 850px minimum.
   -- Its controls end at x≈520, so a fixed 520px canvas avoids the scrollbar
   -- inset shrinking the row to ~504px and clipping the status field.
   self.recipeControls:SetPoint("TOPLEFT", 2, 0); self.recipeControls:SetWidth(520); self.recipeControls:SetHeight(58)
   self.recipeScroll = CreateFrame("ScrollFrame", nil, self.rightPane, "UIPanelScrollFrameTemplate"); self.recipeScroll:SetPoint("TOPLEFT", 2, -58); self.recipeScroll:SetPoint("BOTTOMRIGHT", -16, 0)
   self.recipeContent = CreateFrame("Frame", nil, self.recipeScroll); self.recipeContent:SetSize(500, 1); self.recipeScroll:SetScrollChild(self.recipeContent)
   self:CreateRecipeControls()
-  self:CreateTrackLimitDropdown()
   self.initialized = true
   self:Refresh()
   frame:Hide()
   return self
-end
-
-function UI:CreateTrackLimitDropdown()
-  if not self.trackLimitDropdown or self.trackLimitReady then return end
-  local db = self.repository and self.repository.db
-  local current = db and db.settings and tonumber(db.settings.maxTrackedCharacters) or 3
-  current = math.max(1, math.min(10, math.floor(current)))
-  self.trackLimitCurrent = current
-  if type(UIDropDownMenu_Initialize) == "function" then
-    UIDropDownMenu_Initialize(self.trackLimitDropdown, function(_, level)
-      for value = 1, 10 do
-        local info = UIDropDownMenu_CreateInfo()
-        info.text, info.value, info.checked = tostring(value), value, value == (self.trackLimitCurrent or current)
-        info.func = function() self:SetMaxTrackedCharacters(value) end
-        UIDropDownMenu_AddButton(info, level)
-      end
-    end)
-    if type(UIDropDownMenu_SetText) == "function" then UIDropDownMenu_SetText(self.trackLimitDropdown, tostring(current)) end
-  else
-    self.trackLimitButton = button(self.leftPane, tostring(current), 60, 20)
-    self.trackLimitButton:SetPoint("TOPLEFT", 92, -22)
-    self.trackLimitButton:SetScript("OnClick", function()
-      local nextValue = (self.trackLimitCurrent or current) + 1; if nextValue > 10 then nextValue = 1 end
-      self:SetMaxTrackedCharacters(nextValue)
-    end)
-  end
-  self.trackLimitReady = true
-end
-
-function UI:SetMaxTrackedCharacters(value)
-  local ok, result = false, nil
-  if self.repository and type(self.repository.SetMaxTrackedCharacters) == "function" then ok, result = self.repository:SetMaxTrackedCharacters(value) end
-  if ok then
-    self.trackLimitCurrent = result
-    if type(UIDropDownMenu_SetText) == "function" then UIDropDownMenu_SetText(self.trackLimitDropdown, tostring(result)) end
-    if self.trackLimitButton then self.trackLimitButton:SetText(tostring(result)) end
-    self:Refresh()
-  else
-    self.statusMessage = result or "Unable to change tracking limit"
-    if self.frame then self:Refresh() end
-  end
-  return ok, result
 end
 
 function UI:CreateRecipeControls()
@@ -341,6 +315,13 @@ end
 
 function UI:RefreshCharacters(productKey, product)
   hideRows(self.rows); self.rows = {}
+  local query = self.characterSearch and self.characterSearch:GetText() or ""
+  query = string.lower(query:match("^%s*(.-)%s*$"))
+  local searching = query ~= ""
+  if self.characterSearchClear then self.characterSearchClear:SetShown(searching) end
+  local function matches(value)
+    return searching and string.find(string.lower(tostring(value or "")), query, 1, true) ~= nil
+  end
   local settings = self.repository and self.repository.db and self.repository.db.settings or {}
   local selected = self.selectedCharacterKey or (self.repository and self.repository.GetSelectedCharacterKey and self.repository:GetSelectedCharacterKey()) or settings.selectedCharacterKey
   local pane = GTF.ViewModels.BuildCharacterSelector(product, { now = now(self.env), settings = settings, productKey = productKey, selectedCharacterKey = selected })
@@ -355,16 +336,28 @@ function UI:RefreshCharacters(productKey, product)
   self.selectedCharacterKey = selected
   if self.repository and self.repository.SetSelectedCharacterKey then self.repository:SetSelectedCharacterKey(selected) end
   self.trackedHeader:SetText(pane.header)
-  if self.trackLimitLabel then self.trackLimitLabel:SetText("Track up to") end
   local y, contentHeight = -4, 0
-  local function addTreeRow(caption, indent, height, onClick, font)
+  local function addTreeRow(caption, indent, height, onClick, font, selectedRow)
     height = height or 24
-    local width = math.max(1, 225 - indent)
+    local width = math.max(1, 262 - indent)
     if onClick then
       local row = CreateFrame("Button", nil, self.characterContent)
       row:SetPoint("TOPLEFT", 2 + indent, y); row:SetSize(width, height)
       local line = label(row, font or "GameFontNormalSmall", "LEFT", row, 3, 0, width - 4, height)
       line:SetText(caption)
+      row.gtfLabel = line
+      if type(row.SetHighlightTexture) == "function" then
+        row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+      end
+      if selectedRow then
+        local background = row:CreateTexture(nil, "BACKGROUND")
+        background:SetTexture("Interface\\Buttons\\WHITE8X8")
+        background:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+        background:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+        if type(background.SetVertexColor) == "function" then
+          background:SetVertexColor(0.45, 0.32, 0.08, 0.35)
+        end
+      end
       row:SetScript("OnClick", onClick)
       self.rows[#self.rows + 1] = row
       y = y - height - 2; contentHeight = contentHeight + height + 2
@@ -377,42 +370,121 @@ function UI:RefreshCharacters(productKey, product)
     end
     y = y - height - 2; contentHeight = contentHeight + height + 2
   end
+  local function recipePath(recipe)
+    local path = {}
+    for _, name in ipairs(recipe.categoryPath or {}) do
+      if type(name) == "string" and name ~= "" then path[#path + 1] = name end
+    end
+    if #path == 0 then path[1] = recipe.categoryName or "Uncategorized" end
+    return path
+  end
+  local function groupedCategories(recipes)
+    local root = { children = {}, childOrder = {}, recipes = {} }
+    for _, recipe in ipairs(recipes) do
+      local node = root
+      for _, name in ipairs(recipePath(recipe)) do
+        if not node.children[name] then
+          node.children[name] = { name = name, children = {}, childOrder = {}, recipes = {}, count = 0 }
+          node.childOrder[#node.childOrder + 1] = name
+        end
+        node = node.children[name]
+        node.count = node.count + 1
+      end
+      node.recipes[#node.recipes + 1] = recipe
+    end
+    local function sortNode(node)
+      table.sort(node.childOrder, function(a, b) return string.lower(a) < string.lower(b) end)
+      for _, name in ipairs(node.childOrder) do sortNode(node.children[name]) end
+    end
+    sortNode(root)
+    return root
+  end
+  local function drawCategories(character, profession, node, pathKey, depth)
+    for _, name in ipairs(node.childOrder) do
+      local category = node.children[name]
+      local categoryKey = pathKey .. "\031" .. name
+      local expanded = searching or self.expandedCategories[categoryKey] ~= false
+      local indent = math.min(35 + (depth - 1) * 12, 78)
+      addTreeRow((expanded and "v " or "> ") .. name .. " (" .. tostring(category.count) .. ")",
+        indent, 26, function() self:ToggleCategory(categoryKey) end, "GameFontNormal")
+      if expanded then
+        for _, recipe in ipairs(category.recipes) do
+          local selectedRecipe = tostring(self.selectedRecipeKey or "") == tostring(recipe.key)
+          local definition = product.recipes and product.recipes[recipe.key]
+          local recipeRow = addTreeRow((selectedRecipe and "• " or "  ") .. recipe.name
+            .. wearabilityMarker(self, definition),
+            math.min(indent + 15, 93), 25,
+            function() self:SelectRecipe(character.key, profession.key, recipe.key) end,
+            selectedRecipe and "GameFontHighlight" or "GameFontNormalSmall", selectedRecipe)
+          attachItemTooltip(self, recipeRow, definition and definition.outputItemID,
+            definition and definition.outputItemLink)
+        end
+        drawCategories(character, profession, category, categoryKey, depth + 1)
+      end
+    end
+  end
+  local visibleCharacters = 0
   for _, model in ipairs(pane.characters) do
+    local characterMatches = matches(model.name)
+    local visibleProfessions = {}
+    for _, profession in ipairs(model.professions or {}) do
+      local professionMatches = matches(profession.name)
+      local visibleRecipes = {}
+      for _, recipe in ipairs(profession.recipes or {}) do
+        local categoryMatches = false
+        if searching then
+          for _, categoryName in ipairs(recipePath(recipe)) do
+            if matches(categoryName) then categoryMatches = true; break end
+          end
+        end
+        if not searching or characterMatches or professionMatches or categoryMatches or matches(recipe.name) then
+          visibleRecipes[#visibleRecipes + 1] = recipe
+        end
+      end
+      if not searching or characterMatches or professionMatches or #visibleRecipes > 0 then
+        visibleProfessions[#visibleProfessions + 1] = { model = profession, recipes = visibleRecipes }
+      end
+    end
+    if not searching or characterMatches or #visibleProfessions > 0 then
+    visibleCharacters = visibleCharacters + 1
     local isSelected = tostring(model.key) == tostring(selected)
     local marker = isSelected and "v " or "> "
-    local state = model.tracked and "tracked" or "available"
-    addTreeRow(marker .. model.name .. " L" .. tostring(model.level) .. " [" .. state .. "]", 0, 28,
-      function() self:SelectCharacter(model.key) end)
-    if isSelected then
+    local characterRow = addTreeRow(marker .. model.name .. "  L" .. tostring(model.level), 0, 30,
+      function() self:SelectCharacter(model.key) end, "GameFontHighlight", isSelected)
+    if GTF.ClassIcons and type(GTF.ClassIcons.Apply) == "function" then
+      local classIcon = characterRow:CreateTexture(nil, "ARTWORK")
+      classIcon:SetSize(17, 17)
+      classIcon:SetPoint("RIGHT", characterRow, "RIGHT", -4, 0)
+      if GTF.ClassIcons.Apply(classIcon, model.classID, model.className) then
+        characterRow.gtfLabel:SetWidth(characterRow:GetWidth() - 24)
+      end
+      characterRow.classIcon = classIcon
+    end
+    if isSelected or searching then
       if not self.professionsSupported then
         addTreeRow("Professions unavailable", 14)
-      elseif #(model.professions or {}) == 0 then
+      elseif #visibleProfessions == 0 and not searching then
         addTreeRow("No professions captured yet", 14)
       else
-        for _, profession in ipairs(model.professions) do
+        for _, entry in ipairs(visibleProfessions) do
+          local profession = entry.model
           local treeKey = tostring(model.key) .. "|" .. tostring(profession.key)
-          local expanded = self.expandedProfessions[treeKey] == true
+          local expanded = searching or self.expandedProfessions[treeKey] == true
           addTreeRow((expanded and "v " or "> ") .. profession.name .. " " .. tostring(profession.rank)
-            .. "/" .. tostring(profession.maxRank), 12, 25,
-            function() self:ToggleProfession(model.key, profession.key) end)
+            .. "/" .. tostring(profession.maxRank), 16, 27,
+            function() self:ToggleProfession(model.key, profession.key) end, "GameFontNormal")
           if expanded then
             if not self.recipesSupported then
               addTreeRow("Recipes pending", 27)
-            elseif #(profession.recipes or {}) == 0 then
+            elseif #entry.recipes == 0 then
               addTreeRow("No recipes captured yet", 27)
             else
-              for _, recipe in ipairs(profession.recipes) do
-                local selectedRecipe = tostring(self.selectedRecipeKey or "") == tostring(recipe.key)
-                local recipeRow = addTreeRow((selectedRecipe and "• " or "  ") .. recipe.name, 27, 24,
-                  function() self:SelectRecipe(model.key, profession.key, recipe.key) end)
-                local definition = product.recipes and product.recipes[recipe.key]
-                attachItemTooltip(self, recipeRow, definition and definition.outputItemID,
-                  definition and definition.outputItemLink)
-              end
+              drawCategories(model, profession, groupedCategories(entry.recipes), treeKey, 1)
             end
           end
         end
       end
+    end
     end
   end
   if #pane.characters == 0 then
@@ -420,14 +492,22 @@ function UI:RefreshCharacters(productKey, product)
     empty:SetText(pane.emptyLabel or "No characters discovered yet. Log in with a character to begin tracking.")
     self.rows[#self.rows + 1] = empty
     contentHeight = 42
+  elseif visibleCharacters == 0 then
+    addTreeRow("No matching characters, professions, or recipes", 0, 42)
   end
   self.characterContent:SetHeight(math.max(1, contentHeight + 8))
   self:RefreshDetail(productKey, product, selected)
 end
 
+function UI:ToggleCategory(categoryKey)
+  self.expandedCategories[categoryKey] = self.expandedCategories[categoryKey] == false
+  self:Refresh()
+end
+
 function UI:SelectCharacter(characterKey)
   self.selectedProfessionKey, self.selectedRecipeKey = nil, nil
   self.selectedCharacterKey = characterKey
+  self.tab = "characters"
   if self.repository and type(self.repository.SetSelectedCharacterKey) == "function" then self.repository:SetSelectedCharacterKey(characterKey) end
   self:Refresh()
 end
@@ -460,7 +540,7 @@ function UI:RenderRecipeDetail(product, character, profession, recipeRow, y, wid
   self.detailRows[#self.detailRows + 1] = outputButton
   local title = label(self.detailContent, "GameFontHighlightLarge", "TOPLEFT", self.detailContent, 52, y,
     width - 58, 22)
-  title:SetText(recipeRow.name); self.detailRows[#self.detailRows + 1] = title
+  title:SetText(recipeRow.name .. wearabilityMarker(self, recipe)); self.detailRows[#self.detailRows + 1] = title
   local subtitle = label(self.detailContent, "GameFontNormalSmall", "TOPLEFT", self.detailContent, 52, y - 23,
     width - 58, 18)
   subtitle:SetText(profession.name .. " " .. tostring(profession.rank) .. "/" .. tostring(profession.maxRank))
@@ -595,20 +675,11 @@ function UI:RefreshDetail(productKey, product, characterKey)
   end
   local classLabel = model.className and model.className ~= "" and (" " .. model.className) or ""
   add(model.name .. " — level " .. tostring(model.level) .. classLabel, "GameFontHighlightLarge")
-  add(text(model.realm, "Realm unknown") .. " | " .. text(model.faction, "Faction unknown") .. " | "
-    .. (model.tracked and "tracked" or "not tracked"))
+  add(text(model.realm, "Realm unknown") .. " | " .. text(model.faction, "Faction unknown"))
   add("Last seen: " .. GTF.ViewModels.FormatTimestamp(model.lastSeenAt, self.env) .. " | Bags: "
     .. model.bagsFreshness.label .. " | Bank: " .. model.bankFreshness.label, "GameFontNormalSmall")
-  local track = button(self.detailContent, model.tracked and "Untrack" or "Track", 86, 22)
-  track:SetPoint("TOPLEFT", 8, y - 2)
-  track:SetScript("OnClick", function()
-    local ok, err = self:SetTracked(model.key, not model.tracked)
-    self.statusMessage = ok and nil or err
-    self:Refresh()
-  end)
-  self.detailRows[#self.detailRows + 1] = track
   local forget = button(self.detailContent, "Forget", 70, 22)
-  forget:SetPoint("LEFT", track, "RIGHT", 5, 0)
+  forget:SetPoint("TOPLEFT", 8, y - 2)
   forget:SetScript("OnClick", function() self:ConfirmForget(productKey, model.key, model.name) end)
   self.detailRows[#self.detailRows + 1] = forget
   y = y - 35
@@ -641,13 +712,6 @@ function UI:RefreshDetail(productKey, product, characterKey)
   end
   if self.statusMessage then add(self.statusMessage, "GameFontHighlight") end
   self.detailContent:SetHeight(math.max(120, -y + 20))
-end
-
-function UI:SetTracked(characterKey, tracked)
-  local productKey = getProduct(self)
-  if self.characterService and type(self.characterService.SetTracked) == "function" then return self.characterService:SetTracked(tracked, productKey, characterKey) end
-  if self.repository and type(self.repository.SetTracked) == "function" then return self.repository:SetTracked(productKey, characterKey, tracked == true) end
-  return false
 end
 
 function UI:ConfirmForget(productKey, characterKey, displayName)

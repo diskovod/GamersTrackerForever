@@ -4,6 +4,7 @@ local root = "."
 local files = {
   root .. "/Constants.lua",
   root .. "/Repository.lua",
+  root .. "/ViewModels.lua",
 }
 for _, file in ipairs(files) do
   local chunk, err = loadfile(file)
@@ -19,6 +20,7 @@ local db = repo:Initialize(nil)
 assert(db.schemaVersion == 1)
 assert(db.settings.staleAfterSeconds == 86400)
 assert(db.settings.veryStaleAfterSeconds == 604800)
+assert(db.settings.maxTrackedCharacters == nil, "new installs must not store a character limit")
 assert(type(db.products) == "table" and next(db.products) == nil)
 assert(env.GamersTrackerForeverDB == db)
 
@@ -44,6 +46,10 @@ assert(repo:CommitCharacterContext({
 local character = repo:GetCharacter("classic_era", "realm|ana|alliance")
 assert(character.level == 42 and character.identity.displayName == "Ana")
 assert(character.tracked == true)
+assert(not repo:SetMaxTrackedCharacters(1), "old limit controls must not reactivate a cap")
+assert(repo:GetMaxTrackedCharacters() == nil, "automatic tracking has no count cap")
+assert(not repo:SetTracked("classic_era", "realm|ana|alliance", false), "characters cannot be opted out")
+assert(character.tracked == true, "legacy opt-out calls must preserve automatic tracking")
 assert(repo:GetProduct("forever", true) ~= repo:GetProduct("classic_era", true))
 
 -- Valid snapshot commits replace a complete snapshot atomically.
@@ -137,10 +143,34 @@ assert(recovered.products.healthy.recipes.good.recipeID == 7)
 assert(recovered.products.corruptProduct == nil)
 assert(recovered.products.partial.characters.bad == nil)
 assert(recovered.products.partial.characters.okay.level == 12)
+assert(recovered.products.partial.characters.okay.tracked == true)
 assert(#repo:GetDiagnostics().quarantined == 0) -- previous repository remains unaffected
 local recoveryRepo = GamersTrackerForever.Repository:Create({})
 recoveryRepo:Initialize(mixed)
 assert(#recoveryRepo:GetDiagnostics().quarantined > 0)
+
+-- An existing account can have more than the old cap and opted-out records.
+-- Loading it must retain all snapshots and activate all discovered characters.
+local formerlyLimited = { schemaVersion = 1, settings = { maxTrackedCharacters = 1 }, products = {
+  classic_era = { characters = {
+    first = { tracked = true, level = 20, professions = { smith = { name = "Blacksmithing", rank = 50 } } },
+    second = { tracked = false, level = 30, inventory = { bags = { [2840] = 8 }, bagsScannedAt = 900 } },
+    third = { tracked = false, level = 40 },
+  } },
+} }
+local unlimitedRepo = GamersTrackerForever.Repository:Create({})
+local unlimitedDB = unlimitedRepo:Initialize(formerlyLimited)
+assert(unlimitedDB.settings.maxTrackedCharacters == nil)
+local members = unlimitedDB.products.classic_era.characters
+assert(members.first.tracked and members.second.tracked and members.third.tracked)
+assert(members.first.professions.smith.rank == 50 and members.second.inventory.bags[2840] == 8)
+assert(unlimitedRepo:CommitCharacterContext({ productKey = "classic_era", characterKey = "fourth", level = 10 }, 1000))
+assert(members.fourth.tracked == true, "new characters are tracked beyond the old limit")
+local selector = GamersTrackerForever.ViewModels.BuildCharacterSelector(unlimitedDB.products.classic_era,
+  { settings = unlimitedDB.settings })
+assert(#selector.characters == 4 and selector.trackedCount == 4)
+assert(selector.maxTrackedCharacters == nil and selector.trackLimitLabel == nil)
+assert(selector.header == "Characters 4")
 
 -- A corrupt root is recoverable without leaving a malformed SavedVariables table.
 local rootRepo = GamersTrackerForever.Repository:Create({})
@@ -169,6 +199,9 @@ assert(migrationRepo:CommitRecipeSnapshot("classic_era", "r2", {
   recipeID = 12,
   professionID = 171,
   name = "Bound Tool Recipe",
+  categoryID = 22,
+  categoryName = "Mail Leggings",
+  categoryPath = { "Armor", "Mail Leggings" },
   specialRequirements = {
     tool = { itemID = 456, required = true },
     location = "forge",
@@ -193,6 +226,8 @@ local metadataRecipe = migrated.products.classic_era.recipes.r2
 assert(metadataRecipe.specialRequirements.tool.itemID == 456)
 assert(metadataRecipe.specialRequirements.tool.required == true)
 assert(metadataRecipe.unknownRequirements.reason == "client-specific")
+assert(metadataRecipe.categoryID == 22 and metadataRecipe.categoryName == "Mail Leggings")
+assert(metadataRecipe.categoryPath[1] == "Armor" and metadataRecipe.categoryPath[2] == "Mail Leggings")
 local metadataReagent = metadataRecipe.reagents[1]
 assert(metadataReagent.kind == "item" and metadataReagent.soulbound == true and metadataReagent.currency == false)
 assert(metadataReagent.tool == true and metadataReagent.locationBound == true and metadataReagent.quality == 3)
@@ -200,6 +235,7 @@ assert(metadataReagent.substitutable == false and metadataReagent.unknownRequire
 local reloaded = migrationRepo:Initialize(migrated)
 local reloadedRecipe = reloaded.products.classic_era.recipes.r2
 assert(reloadedRecipe.specialRequirements.location == "forge")
+assert(reloadedRecipe.categoryPath[1] == "Armor" and reloadedRecipe.categoryName == "Mail Leggings")
 assert(reloadedRecipe.reagents[1].soulbound == true and reloadedRecipe.reagents[1].tool == true)
 
 -- A newer schema is retained verbatim and exposed read-only for downgrade safety.

@@ -1,5 +1,5 @@
 -- Lua 5.1 fixture tests for Task 6 projections and a frame-construction smoke test.
-local files = { "Constants.lua", "Repository.lua", "CraftabilityService.lua", "RecipeCatalog.lua", "ViewModels.lua", "UI.lua" }
+local files = { "Constants.lua", "Repository.lua", "CraftabilityService.lua", "RecipeCatalog.lua", "ViewModels.lua", "ClassIcons.lua", "ItemUsability.lua", "UI.lua" }
 for _, file in ipairs(files) do local chunk, err = loadfile(file); assert(chunk, err); chunk() end
 
 local function same(actual, expected, message)
@@ -18,7 +18,9 @@ product.characters = {
     inventory = { bags = {}, bank = {}, bagsScannedAt = 0, bankScannedAt = 0 } },
   isolated = { tracked = true, identity = { displayName = "Isolated", transferGroup = "other" }, level = 10, lastSeenAt = 1999, inventory = { bags = {}, bank = {}, bagsScannedAt = 1999, bankScannedAt = 1999 } },
 }
-product.recipes["recipe:1"] = { recipeID = 1, professionID = 171, name = "Test Potion", outputItemID = 900, reagents = { { itemID = 100, quantity = 10, kind = "item" } } }
+product.recipes["recipe:1"] = { recipeID = 1, professionID = 171, name = "Test Potion",
+  categoryName = "Healing", categoryPath = { "Potions", "Healing" },
+  outputItemID = 900, reagents = { { itemID = 100, quantity = 10, kind = "item" } } }
 product.recipes["recipe:2"] = { recipeID = 2, professionID = 164, name = "Copper Buckle", reagents = {} }
 local service = GamersTrackerForever.CraftabilityService:Create(repo, { now = function() return 2000 end })
 local catalog = GamersTrackerForever.RecipeCatalog:Create(repo, { productKey = "classic_era", craftabilityService = service })
@@ -29,18 +31,16 @@ same(characterRows[1].lastSeenLabel, "10s ago", "age formatting")
 same(characterRows[1].bagsFreshness.state, "current", "bag freshness")
 same(characterRows[1].professions[1].recipeScanState, "current", "profession scan state")
 same(characterRows[1].professions[1].recipes[1].name, "Test Potion", "learned recipe appears under profession")
+same(characterRows[1].professions[1].recipes[1].categoryPath[1], "Potions", "category ancestry reaches UI")
 same(characterRows[1].professions[1].learnedCount, 1, "learned recipe count uses true entries")
 assert(characterRows[1].expanded, "expanded map is projected")
 local pane = GamersTrackerForever.ViewModels.BuildTwoPane(product, { now = 2000, settings = db.settings, productKey = "classic_era", selectedCharacterKey = "ana" })
 same(pane.left.selectedCharacterKey, "ana", "selection is deterministic")
-same(pane.left.maxTrackedCharacters, 3, "default tracking limit")
+same(pane.left.trackedCount, 3, "all discovered characters are tracked")
 same(pane.right.inventoryRows[1].itemID, 100, "detail exposes sorted inventory rows")
 same(pane.right.inventoryRows[1].bags, 4, "detail exposes bag counts")
 product.characters.extra = { tracked = false, identity = { displayName = "Extra" }, inventory = { bags = {}, bank = {} } }
-assert(repo:SetMaxTrackedCharacters(1))
-local limited, limitError = repo:SetTracked("classic_era", "extra", true)
-assert(not limited and limitError:find("tracking limit", 1, true), "tracking limit is enforced without untracking")
-assert(repo:SetMaxTrackedCharacters(3))
+assert(repo:SetTracked("classic_era", "extra", true), "discovered character may be tracked without a count limit")
 
 local recipeRows = GamersTrackerForever.ViewModels.BuildRecipes(catalog, "classic_era", { search = "potion", profession = "Alchemy" })
 same(#recipeRows, 1, "recipe search and profession filters")
@@ -58,7 +58,7 @@ same(materialRows[1].afterTransferShortage, 0, "after-transfer shortage")
 same(materialRows[1].afterTransferStatus, "stale", "after-transfer status")
 same(GamersTrackerForever.ViewModels.FormatAvailability(calc.availableNow), "short (0 crafts)", "render-ready now summary")
 same(GamersTrackerForever.ViewModels.FormatAvailability(calc.afterTransfer), "stale (2 crafts)", "render-ready transfer summary")
-same(#materialRows[1].characters, 3, "all tracked characters represented, including isolated")
+same(#materialRows[1].characters, 4, "all tracked characters represented, including isolated")
 local specialRows = GamersTrackerForever.ViewModels.BuildMaterialRows(
   { reagents = { { name = "Anvil", kind = "tool" } } },
   { reagents = { { itemID = nil, quantity = 1, kind = "special" } } })
@@ -81,10 +81,16 @@ local function mockFrame()
   function f:SetBackdrop(value) self.backdrop = value end
   function f:SetBackdropColor(...) self.backdropColor = { ... } end
   function f:SetScrollChild(v) self.child = v end
-  function f:SetAutoFocus() end; function f:SetTextInsets() end; function f:SetHighlightTexture() end
+  function f:SetAutoFocus() end; function f:SetTextInsets() end; function f:SetHighlightTexture() end; function f:ClearFocus() end
   function f:SetText(v) self.text = v end; function f:GetText() return self.text or "" end
   function f:SetTexture(v) self.texture = v end
-  function f:CreateFontString() return mockFrame() end
+  function f:SetTexCoord(...) self.texCoord = { ... } end
+  function f:CreateFontString()
+    local fontString = mockFrame()
+    self.fontStrings = self.fontStrings or {}
+    self.fontStrings[#self.fontStrings + 1] = fontString
+    return fontString
+  end
   function f:CreateTexture()
     local texture = mockFrame()
     self.textures = self.textures or {}
@@ -129,18 +135,89 @@ assert(ui.frame and ui.initialized and ui.title and ui.characterScroll, "mocked-
 same(ui.frame.w, 900, "native UI default width")
 same(ui.frame.h, 560, "native UI default height")
 same(ui.frame.backdrop.bgFile, "Interface\\Buttons\\WHITE8X8", "solid native backdrop keeps world and chat legible")
-same(dropdownWidth, 92, "dropdown width uses frame-first SoD signature")
-same(dropdownText, "3", "dropdown text uses frame-first SoD signature")
+assert(ui.characterSearch and ui.characterSearchClear and not ui.trackLimitDropdown,
+  "left search replaces the tracking-limit dropdown")
+assert(not ui.tabs.characters and ui.tabs.recipes.text == "All Recipes"
+  and ui.tabs.recipes.point[1] == "TOPLEFT", "redundant Characters tab is removed without a header gap")
+local sawMageIcon = false
+for _, row in ipairs(ui.rows or {}) do
+  if row.classIcon and row.classIcon.texture == GamersTrackerForever.ClassIcons.TEXTURE then
+    sawMageIcon = true
+    same(row.classIcon.texCoord[1], 0.25, "Mage class icon uses the Blizzard sprite")
+  end
+end
+assert(sawMageIcon, "known character class gets a small icon in the left tree")
+local function treeContains(needle)
+  for _, row in ipairs(ui.rows or {}) do
+    local caption = row.fontStrings and row.fontStrings[1] and row.fontStrings[1].text or row.text
+    if tostring(caption or ""):find(needle, 1, true) then return true end
+  end
+  return false
+end
+assert(not treeContains("Test Potion"), "collapsed profession initially hides its recipe")
+ui.characterSearch:SetText("PoTiOn")
+ui.characterSearch.scripts.OnTextChanged()
+assert(treeContains("Ana") and treeContains("Corvin") and treeContains("Test Potion"),
+  "case-insensitive recipe search shows matching recipes and ancestor characters")
+assert(not treeContains("Isolated"), "recipe search filters unrelated characters")
+assert(ui.expandedProfessions["ana|alchemy"] == nil, "search does not change expansion preference")
+ui.characterSearch:SetText("Corvin")
+ui.characterSearch.scripts.OnTextChanged()
+assert(treeContains("Corvin") and treeContains("Alchemy") and treeContains("Test Potion")
+  and not treeContains("Ana"), "character search shows its descendant professions and recipes")
+ui.characterSearch:SetText("Alchemy")
+ui.characterSearch.scripts.OnTextChanged()
+assert(treeContains("Ana") and treeContains("Corvin") and treeContains("Test Potion"),
+  "profession search shows ancestor characters and descendant recipes")
+ui.characterSearchClear.scripts.OnClick()
+assert(ui.characterSearch:GetText() == "" and not treeContains("Test Potion")
+  and ui.expandedProfessions["ana|alchemy"] == nil,
+  "clear restores collapsed expansion without changing it")
+assert(not treeContains("[tracked]") and not treeContains("[available]"),
+  "all discovered characters are shown without obsolete tracking badges")
 for _, row in ipairs(ui.detailRows or {}) do
   assert(not tostring(row.text or ""):find("Saved inventory", 1, true)
     and not tostring(row.text or ""):find("Item 100", 1, true), "overview must not dump raw inventory")
+  assert(row.text ~= "Track" and row.text ~= "Untrack", "manual tracking control is removed")
 end
 ui:ToggleProfession("ana", "alchemy")
 assert(ui.expandedProfessions["ana|alchemy"] and ui.selectedProfessionKey == "alchemy",
   "profession expands beneath the selected character")
+assert(treeContains("Potions") and treeContains("Healing") and treeContains("Test Potion"),
+  "native category hierarchy renders under the profession")
+local categoryKey = "ana|alchemy\031Potions"
+ui:ToggleCategory(categoryKey)
+assert(ui.expandedCategories[categoryKey] == false and treeContains("Potions")
+  and not treeContains("Healing") and not treeContains("Test Potion"),
+  "collapsing a category hides descendant categories and recipes")
+ui.characterSearch:SetText("healing")
+ui.characterSearch.scripts.OnTextChanged()
+assert(treeContains("Ana") and treeContains("Alchemy") and treeContains("Potions")
+  and treeContains("Healing") and treeContains("Test Potion"),
+  "searching by native category shows matching recipes and all ancestors")
+ui.characterSearchClear.scripts.OnClick()
+assert(ui.expandedCategories[categoryKey] == false and not treeContains("Test Potion"),
+  "clearing search restores category collapse preference")
+ui:ToggleCategory(categoryKey)
+assert(treeContains("Test Potion"), "reopening a category restores its recipes")
 ui:SelectRecipe("ana", "alchemy", "recipe:1")
 assert(ui.selectedRecipeKey == "recipe:1" and #ui.materialCards == 1,
   "recipe selection renders a material card")
+local testSubclass = 3 -- mail armor is permanently unavailable to Priests
+ui.env.UnitClass = function() return "Priest", "PRIEST", 5 end
+ui.env.GetItemInfoInstant = function(itemID)
+  if itemID == 900 then return 900, "Armor", "Mail", "INVTYPE_CHEST", nil, 4, testSubclass end
+end
+ui:Refresh()
+assert(treeContains("Test Potion |cffff4040×|r"), "red cross follows logged-in Priest, not saved Mage crafter")
+local sawDetailCross = false
+for _, row in ipairs(ui.detailRows or {}) do
+  if tostring(row.text or ""):find("Test Potion |cffff4040×|r", 1, true) then sawDetailCross = true end
+end
+assert(sawDetailCross, "selected recipe detail also marks confirmed unwearable output")
+testSubclass = 1 -- cloth is not crossed out
+ui:Refresh()
+assert(not treeContains("Test Potion |cffff4040×|r"), "allowed armor is not crossed out")
 assert(ui.outputItemButton and type(ui.outputItemButton.scripts.OnEnter) == "function",
   "crafted item icon must offer a native item tooltip")
 ui.outputItemButton.scripts.OnEnter(ui.outputItemButton)
@@ -172,10 +249,13 @@ for _, row in ipairs(ui.rows or {}) do
 end
 assert(recipeTreeTooltip, "recipe rows also show the crafted item tooltip")
 same(ui.materialCards[1].textures[1].texture, 555, "material card uses the item texture, not item quality")
-same(#ui.sourceRows, 3, "separate holdings panel includes every tracked character")
+same(#ui.sourceRows, 4, "separate holdings panel includes every tracked character")
 ui:SelectCharacter("ana")
 assert(ui.selectedRecipeKey == nil, "selecting a character returns to its overview")
 ui.tab = "recipes"; ui:Refresh(); assert(ui.recipeScroll and ui.recipeContent, "recipes tab renders")
+ui:SelectCharacter("ana")
+same(ui.tab, "characters", "selecting a character exits the all-recipes view without a Characters tab")
+ui.tab = "recipes"; ui:Refresh()
 -- Filter callbacks used to invoke RefreshRecipes without its product arguments,
 -- leaving the pane blank and raising a nil-product Lua error.
 assert(type(ui.recipeSearch.scripts.OnTextChanged) == "function")

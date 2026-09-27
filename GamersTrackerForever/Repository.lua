@@ -83,7 +83,6 @@ local function defaultSettings()
     -- survive a reload without being mistaken for scanner data.
     minimapButton = true,
     minimapAngle = 0,
-    maxTrackedCharacters = 3,
     selectedCharacterKey = nil,
     uiGeometry = {
       point = "CENTER",
@@ -217,7 +216,6 @@ local function normalizeSettings(value, diagnostics)
     veryStaleAfterSeconds = numberOr(value.veryStaleAfterSeconds, 604800),
     minimapButton = value.minimapButton ~= false,
     minimapAngle = numberOr(value.minimapAngle, defaults.minimapAngle),
-    maxTrackedCharacters = math.max(1, math.min(10, math.floor(numberOr(value.maxTrackedCharacters, defaults.maxTrackedCharacters)))),
     selectedCharacterKey = optionalString(value.selectedCharacterKey),
     uiGeometry = geometry,
   }
@@ -297,11 +295,28 @@ local function normalizeRecipe(value, diagnostics, path)
       diagnostics.quarantined[#diagnostics.quarantined + 1] = path .. ".unknownRequirements"
     end
   end
+  local categoryPath = {}
+  if type(value.categoryPath) == "table" then
+    for index = 1, math.min(#value.categoryPath, 8) do
+      local name = value.categoryPath[index]
+      if type(name) == "string" and name ~= "" then
+        categoryPath[#categoryPath + 1] = name
+      end
+    end
+  end
+  local categoryName = type(value.categoryName) == "string" and value.categoryName ~= ""
+    and value.categoryName or categoryPath[#categoryPath]
+  if categoryName and #categoryPath == 0 then categoryPath[1] = categoryName end
+  local categoryID = tonumber(value.categoryID)
+  if not categoryID or categoryID <= 0 or categoryID ~= math.floor(categoryID) then categoryID = nil end
   return {
     recipeID = numberOr(value.recipeID, 0),
     professionID = numberOr(value.professionID, 0),
     professionName = stringOr(value.professionName, ""),
     name = stringOr(value.name, ""),
+    categoryID = categoryID,
+    categoryName = categoryName,
+    categoryPath = categoryPath,
     icon = numberOr(value.icon, 0),
     outputItemID = numberOr(value.outputItemID, 0),
     outputMin = numberOr(value.outputMin, 1),
@@ -467,7 +482,9 @@ local function normalizeCharacter(value, diagnostics, path)
     return nil
   end
   local result = defaultCharacter()
-  result.tracked = value.tracked ~= false
+  -- Older releases allowed opt-out. All characters in this account's saved
+  -- product partition are now included, without discarding their snapshots.
+  result.tracked = true
   result.identity = normalizeIdentity(value.identity, diagnostics, path .. ".identity")
   result.client = normalizeClient(value.client, diagnostics, path .. ".client")
   result.level = numberOr(value.level, 0)
@@ -699,6 +716,7 @@ function Repository:UpsertCharacter(productKey, characterKey, context)
     return nil, "product and character keys are required"
   end
   local character = self:GetCharacter(productKey, characterKey, true)
+  character.tracked = true
   context = context or {}
   if type(context.identity) == "table" then
     character.identity = normalizeIdentity(context.identity, self.diagnostics, "context.identity")
@@ -754,34 +772,20 @@ function Repository:SetTracked(productKey, characterKey, tracked)
   if not character or type(tracked) ~= "boolean" then
     return false
   end
-  if tracked and character.tracked ~= true then
-    local settings = self.db and self.db.settings or defaultSettings()
-    local limit = math.max(1, math.min(10, math.floor(numberOr(settings.maxTrackedCharacters, 3))))
-    local count = 0
-    local product = self:GetProduct(productKey, false)
-    for _, candidate in pairs(product and product.characters or {}) do
-      if type(candidate) == "table" and candidate.tracked == true then count = count + 1 end
-    end
-    if count >= limit then
-      return false, "tracking limit reached (" .. tostring(limit) .. ")"
-    end
+  if not tracked then
+    return false, "all discovered characters are tracked automatically"
   end
-  character.tracked = tracked
+  character.tracked = true
   return true
 end
 
 function Repository:GetMaxTrackedCharacters()
-  local settings = self.db and self.db.settings or defaultSettings()
-  return math.max(1, math.min(10, math.floor(numberOr(settings.maxTrackedCharacters, 3))))
+  -- Compatibility shim for callers from older releases: nil means unlimited.
+  return nil
 end
 
 function Repository:SetMaxTrackedCharacters(value)
-  if self.readOnly then return false, "repository is read-only for a newer schema" end
-  local limit = tonumber(value)
-  if not limit then return false, "tracking limit must be a number" end
-  limit = math.max(1, math.min(10, math.floor(limit)))
-  self.db.settings.maxTrackedCharacters = limit
-  return true, limit
+  return false, "character tracking has no count limit"
 end
 
 function Repository:GetSelectedCharacterKey()

@@ -49,6 +49,19 @@ for _, file in ipairs(files) do
   chunk()
 end
 
+-- Classic/Forever builds may omit UnitClass's third (numeric) return value.
+-- Saved class identity still needs an ID so the character tree can show its icon.
+local twoReturnAdapter = GamersTrackerForever.ApiCompat.CreateClassic({
+  UnitClass = function() return "Priest", "PRIEST" end,
+})
+assert(twoReturnAdapter:GetCurrentContext().identity.classID == 5,
+  "two-return UnitClass must retain the class ID from its token")
+local numericSecondAdapter = GamersTrackerForever.ApiCompat.CreateClassic({
+  UnitClass = function() return "Warrior", 1 end,
+})
+assert(numericSecondAdapter:GetCurrentContext().identity.classID == 1,
+  "legacy numeric second return must remain supported")
+
 assert(GamersTrackerForever:Initialize())
 assert(GamersTrackerForever.product == "classic_era")
 assert(GamersTrackerForever.Api:GetCurrentContext().key == "Player-1-0001")

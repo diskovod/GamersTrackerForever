@@ -24,6 +24,19 @@ local function safeString(value)
   return tostring(value)
 end
 
+local classIDByToken = {
+  WARRIOR = 1, PALADIN = 2, HUNTER = 3, ROGUE = 4, PRIEST = 5,
+  DEATHKNIGHT = 6, SHAMAN = 7, MAGE = 8, WARLOCK = 9, MONK = 10,
+  DRUID = 11, DEMONHUNTER = 12, EVOKER = 13,
+}
+
+local function resolveClassID(classToken, classID)
+  local numeric = tonumber(classID) or tonumber(classToken)
+  if numeric and numeric > 0 then return numeric end
+  if type(classToken) == "string" then return classIDByToken[classToken:upper()] or 0 end
+  return 0
+end
+
 local Classic = {}
 Classic.__index = Classic
 
@@ -101,7 +114,7 @@ function Classic:GetCurrentIdentity()
     region = nil,
     ruleset = "classic_era",
     faction = safeString(faction),
-    classID = tonumber(classID or classToken) or 0,
+    classID = resolveClassID(classToken, classID),
     className = safeString(localizedClass),
   }
 end

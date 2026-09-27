@@ -12,7 +12,13 @@ local env = {
   C_TradeSkillUI = {
     GetAllRecipeIDs = function() return malformed and { 1001, "bad" } or list end,
     GetRecipeInfo = function(id)
-      return { recipeID = id, name = "Recipe " .. id, learned = id ~= 1003, icon = 44 }
+      return { recipeID = id, name = "Recipe " .. id, learned = id ~= 1003,
+        icon = 44, categoryID = id == 1001 and 22 or 23 }
+    end,
+    GetCategoryInfo = function(id)
+      if id == 22 then return { name = "Mail Leggings", parentCategoryID = 21 } end
+      if id == 21 then return { name = "Armor", parentCategoryID = 0 } end
+      if id == 23 then return { name = "Weapon Stones", parentCategoryID = 0 } end
     end,
     GetProfessionInfoByRecipeID = function(id)
       if mixed and id == 1003 then return { professionID = 1234, professionName = "Cooking" } end
@@ -46,6 +52,11 @@ assert(profession.scanState == "current")
 assert(profession.learnedRecipes["recipe:1001"] and profession.learnedRecipes["recipe:1002"])
 assert(not profession.learnedRecipes["recipe:1003"])
 assert(product.recipes["recipe:1001"].professionID == 2938)
+assert(product.recipes["recipe:1001"].categoryID == 22)
+assert(product.recipes["recipe:1001"].categoryName == "Mail Leggings")
+assert(product.recipes["recipe:1001"].categoryPath[1] == "Armor")
+assert(product.recipes["recipe:1001"].categoryPath[2] == "Mail Leggings")
+assert(product.recipes["recipe:1002"].categoryName == "Weapon Stones")
 assert(product.recipes["recipe:1001"].reagents[1].itemID == 118)
 assert(product.recipes["recipe:1001"].reagents[1].quantity == 2)
 assert(product.recipes["recipe:1001"].outputMin == 1)
@@ -64,6 +75,14 @@ mixed = false
 malformed = true
 assert(not modern:ScanOpen(1100).success, "invalid recipe ID must not commit")
 malformed = false
+
+-- Missing category metadata is not a recipe-data failure.
+local categoryLookup = env.C_TradeSkillUI.GetCategoryInfo
+env.C_TradeSkillUI.GetCategoryInfo = nil
+assert(modern:ScanOpen(1150).success)
+assert(product.recipes["recipe:1001"].categoryID == 22)
+assert(product.recipes["recipe:1001"].categoryName == nil)
+env.C_TradeSkillUI.GetCategoryInfo = categoryLookup
 
 list = { 1001, 1003 }
 assert(modern:ScanOpen(1200).success)

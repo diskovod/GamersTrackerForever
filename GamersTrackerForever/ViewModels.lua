@@ -138,7 +138,7 @@ function ViewModels.BuildCharacters(product, options)
   table.sort(characterKeys, function(a, b) return compareCharacters(characters, a, b) end)
   for _, key in ipairs(characterKeys) do
     local character = characters[key]
-    if options.includeUntracked ~= false or character.tracked == true then
+    if type(character) == "table" then
       local identity, inventory = character.identity or {}, character.inventory or {}
       local professionRows = {}
       for professionKey, profession in pairs(character.professions or {}) do
@@ -151,6 +151,10 @@ function ViewModels.BuildCharacters(product, options)
                 key = recipeKey,
                 name = text(recipe and recipe.name, "Recipe " .. tostring(recipeKey)),
                 icon = recipe and recipe.icon or nil,
+                categoryID = recipe and recipe.categoryID or nil,
+                categoryName = text(recipe and recipe.categoryName, "Uncategorized"),
+                categoryPath = recipe and type(recipe.categoryPath) == "table"
+                  and recipe.categoryPath or {},
                 definitionAvailable = type(recipe) == "table",
               }
             end
@@ -172,7 +176,7 @@ function ViewModels.BuildCharacters(product, options)
       end
       table.sort(professionRows, compareProfession)
       rows[#rows + 1] = {
-        key = key, tracked = character.tracked == true, name = characterName(character, key),
+        key = key, tracked = true, name = characterName(character, key),
         level = number(character.level, 0), classID = number(identity.classID, 0),
         className = text(identity.className, ""), faction = text(identity.faction, ""),
         product = text(identity.product, options.productKey or ""), realm = identity.realm,
@@ -198,16 +202,13 @@ function ViewModels.BuildCharacterSelector(product, options)
   local settings = options.settings or {}
   local rows = ViewModels.BuildCharacters(product, {
     now = options.now, settings = settings, productKey = options.productKey,
-    includeUntracked = true, selectedCharacterKey = options.selectedCharacterKey or settings.selectedCharacterKey,
+    selectedCharacterKey = options.selectedCharacterKey or settings.selectedCharacterKey,
     itemResolver = options.itemResolver, includeInventoryRows = false,
   })
-  local tracked = 0
-  for _, row in ipairs(rows) do if row.tracked then tracked = tracked + 1 end end
-  local limit = math.max(1, math.min(10, math.floor(number(options.maxTrackedCharacters or settings.maxTrackedCharacters, 3))))
-  return { characters = rows, rows = rows, trackedCount = tracked, maxTrackedCharacters = limit,
+  return { characters = rows, rows = rows, trackedCount = #rows,
     selectedCharacterKey = options.selectedCharacterKey or settings.selectedCharacterKey,
-    header = "Tracked " .. tostring(tracked) .. " / " .. tostring(limit),
-    trackLimitLabel = "Track up to", emptyLabel = #rows == 0 and "No characters discovered yet" or nil }
+    header = "Characters " .. tostring(#rows),
+    emptyLabel = #rows == 0 and "No characters discovered yet" or nil }
 end
 
 function ViewModels.BuildCharacterDetail(product, characterKey, options)
@@ -219,7 +220,7 @@ function ViewModels.BuildCharacterDetail(product, characterKey, options)
       message = "Select a discovered character from the list." }
   end
   local rows = ViewModels.BuildCharacters(product, { now = options.now, settings = options.settings,
-    includeUntracked = true, selectedCharacterKey = characterKey, itemResolver = options.itemResolver,
+    selectedCharacterKey = characterKey, itemResolver = options.itemResolver,
     includeInventoryRows = options.includeInventoryRows })
   for _, row in ipairs(rows) do if tostring(row.key) == tostring(characterKey) then
     row.empty = false; row.overview = { name = row.name, realm = row.realm, level = row.level,

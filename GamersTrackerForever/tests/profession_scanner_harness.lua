@@ -70,6 +70,24 @@ assert(product.recipes["recipe:1001"].reagents[1].itemID == 3001)
 assert(character.professions["profession:164"].learnedRecipes["recipe:1002"])
 assert(character.professions["profession:164"].scanState == "current")
 
+-- Expanded native headers are captured as recipe category ancestry; a new
+-- top-level header must not inherit the previous subcategory.
+local plainRows = rows
+rows = {
+  { name = "Metal", kind = "header", isExpanded = true },
+  { name = "Bars", kind = "subheader", isExpanded = true },
+  plainRows[1],
+  { name = "Jewelry", kind = "header", isExpanded = true },
+  plainRows[2],
+}
+assert(scanner:ScanLoadedProfession(1000).success)
+assert(product.recipes["recipe:1001"].categoryName == "Bars")
+assert(product.recipes["recipe:1001"].categoryPath[1] == "Metal")
+assert(product.recipes["recipe:1001"].categoryPath[2] == "Bars")
+assert(product.recipes["recipe:1002"].categoryName == "Jewelry")
+assert(#product.recipes["recipe:1002"].categoryPath == 1)
+rows = plainRows
+
 -- A row with no usable link makes the scan incomplete and must preserve both
 -- the previous learned set and product recipe definitions.
 local oldRecipe = product.recipes["recipe:1001"]

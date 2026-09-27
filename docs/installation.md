@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.12 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.13 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.12.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.13.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -20,14 +20,20 @@
 - `/gtf minimap on|off|toggle` controls the optional minimap button (enabled by default); the same subcommands work through `/act`.
 - The key binding is **Toggle GamersTrackerForever**.
 - Use `/reload` after changing the addon files. The addon never forces a reload.
-- The native window lists characters on the left. Select one to reveal its
-  professions and ranks, expand a profession to browse captured recipes, then
-  select a recipe to see material icons and quantities on the right. A separate
-  panel below shows each tracked character's last-known bag/bank holdings.
+- Every character that logs in with the addon is included automatically; there
+  is no tracking limit or separate Characters tab. The left pane has a search
+  field and a Character → Profession → Category → Recipe tree. Expand a
+  character and profession to browse captured recipes, then select a recipe to
+  see material icons and quantities on the right. Categories appear when the
+  client exposes them; otherwise recipes are grouped as Uncategorized. The
+  All Recipes button opens the cross-character recipe view. A separate panel
+  below shows each character's last-known bag/bank holdings.
   Hover a recipe row, crafted item icon, or material card for the native item
   tooltip. An equipped-item comparison appears when the client provides it.
-  Use `Track up to` to choose 1–10 tracked characters (default 3); a full limit
-  does not untrack anyone automatically.
+  A small class icon identifies each character. A red X marks equipment the
+  currently logged-in character cannot wear when the item type is known;
+  unknown or uncached items are not marked. Forget is available on a selected
+  character, but logging that character in again will add it back.
 
 ## Data and freshness
 
@@ -65,3 +71,9 @@ Material totals distinguish bags from bank, compatible transfer ecosystems from 
   claiming a complete scan. Bank scanning and transfer-group calculations
   remain unavailable on this beta client. Classic Era still needs in-client
   recipe regression testing.
+- Beta.13 loaded after `/reload` without a visible Lua error. The two-pane
+  window, class icon, expandable profession tree, saved recipes, material
+  detail, and nearby native tooltip were observed in the running client.
+  Existing recipes appeared under Uncategorized because their saved snapshots
+  predate category capture; category assignment after a fresh profession scan,
+  left-search behavior, and the red-X hint still need live acceptance checks.

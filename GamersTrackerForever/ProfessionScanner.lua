@@ -338,6 +338,7 @@ function Scanner:_scanRows(profession, scanAt)
   count = tonumber(count) or 0
   local attempts, expanded = 0, {}
   local rows = {}
+  local categoryPath = {}
   local index = 1
   while index <= count do
     local rowOK, row, rowErr = pcall(api.GetTradeSkillInfo, api, index)
@@ -356,13 +357,22 @@ function Scanner:_scanRows(profession, scanAt)
           count = countOK and (nextCount or count) or count
           index = 1
           rows = {}
+          categoryPath = {}
         else
           index = index + 1
         end
       else
+        local kind = rowType(row)
+        if kind == "subheader" then
+          categoryPath[2] = type(row.name) == "string" and row.name or nil
+        elseif kind ~= "separator" then
+          categoryPath = {}
+          if type(row.name) == "string" and row.name ~= "" then categoryPath[1] = row.name end
+        end
         index = index + 1
       end
     else
+      row.categoryPath = copy(categoryPath)
       rows[#rows + 1] = row
       index = index + 1
     end
@@ -423,6 +433,8 @@ function Scanner:_normalizeRecipe(profession, index, row, scanAt)
     recipeID = recipeID or 0,
     professionID = positive(profession.professionID) or 0,
     name = tostring(row.name or ""),
+    categoryName = row.categoryPath and row.categoryPath[#row.categoryPath] or nil,
+    categoryPath = row.categoryPath,
     icon = icon or 0,
     outputItemID = outputItemID or 0,
     outputItemLink = outputLink,
