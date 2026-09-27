@@ -89,9 +89,9 @@ end
 local function createBackdrop(frame)
   if not frame then return end
   if type(frame.SetBackdrop) == "function" then
-    frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,
+    frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,
       insets = { left = 4, right = 4, top = 4, bottom = 4 } })
-    frame:SetBackdropColor(0.05, 0.05, 0.08, 0.96)
+    frame:SetBackdropColor(0.04, 0.04, 0.06, 0.96)
   end
 end
 
@@ -355,7 +355,7 @@ function UI:RefreshCharacters(productKey, product)
             function() self:ToggleProfession(model.key, profession.key) end)
           if expanded then
             if not self.recipesSupported then
-              addTreeRow("Recipes unavailable on this client", 27, 30)
+              addTreeRow("Recipes pending", 27)
             elseif #(profession.recipes or {}) == 0 then
               addTreeRow("No recipes captured yet", 27)
             else
@@ -579,7 +579,7 @@ function UI:RefreshDetail(productKey, product, characterKey)
     add(selectedProfession.name .. " " .. tostring(selectedProfession.rank) .. "/"
       .. tostring(selectedProfession.maxRank), "GameFontHighlight")
     if not self.recipesSupported then
-      add("Recipe capture is not yet supported on this client.", "GameFontDisableSmall")
+      add("Forever beta recipe capture is pending API validation.", "GameFontNormalSmall")
     elseif #(selectedProfession.recipes or {}) == 0 then
       add("No recipes captured yet. Open this profession in game to scan it.", "GameFontDisableSmall")
     else

@@ -78,7 +78,9 @@ local function mockFrame()
   function f:SetMovable() end; function f:EnableMouse() end; function f:SetResizable() end; function f:SetResizeBounds() end; function f:SetMinResize() end
   function f:RegisterForDrag() end; function f:SetScript(name, fn) self.scripts[name] = fn end; function f:StartMoving() end; function f:StopMovingOrSizing() end
   function f:Show() self.shown = true end; function f:Hide() self.shown = false end; function f:IsShown() return self.shown end; function f:SetShown(v) self.shown = v end
-  function f:SetBackdrop() end; function f:SetBackdropColor() end; function f:SetScrollChild(v) self.child = v end
+  function f:SetBackdrop(value) self.backdrop = value end
+  function f:SetBackdropColor(...) self.backdropColor = { ... } end
+  function f:SetScrollChild(v) self.child = v end
   function f:SetAutoFocus() end; function f:SetTextInsets() end; function f:SetHighlightTexture() end
   function f:SetText(v) self.text = v end; function f:GetText() return self.text or "" end
   function f:SetTexture(v) self.texture = v end
@@ -114,6 +116,7 @@ ui:Initialize()
 assert(ui.frame and ui.initialized and ui.title and ui.characterScroll, "mocked-frame UI initializes")
 same(ui.frame.w, 900, "native UI default width")
 same(ui.frame.h, 560, "native UI default height")
+same(ui.frame.backdrop.bgFile, "Interface\\Buttons\\WHITE8X8", "solid native backdrop keeps world and chat legible")
 same(dropdownWidth, 92, "dropdown width uses frame-first SoD signature")
 same(dropdownText, "3", "dropdown text uses frame-first SoD signature")
 for _, row in ipairs(ui.detailRows or {}) do
@@ -140,11 +143,11 @@ local betaUI = GamersTrackerForever.UI:Create({ env = { time = function() return
   repository = repo, productKey = "forever_beta", recipesSupported = false })
 betaUI:Initialize()
 betaUI:ToggleProfession("beta", "smithing")
-local sawUnavailable = false
+local sawPending = false
 for _, row in ipairs(betaUI.rows) do
-  if tostring(row.text or ""):find("Recipes unavailable on this client", 1, true) then sawUnavailable = true end
+  if tostring(row.text or ""):find("Recipes pending", 1, true) then sawPending = true end
 end
-assert(sawUnavailable and not betaUI.tabs.recipes:IsShown(),
+assert(sawPending and not betaUI.tabs.recipes:IsShown(),
   "Forever beta shows profession ranks but does not fabricate recipe choices")
 
 print("GamersTrackerForever Task 6 UI/view-model harness: PASS")
