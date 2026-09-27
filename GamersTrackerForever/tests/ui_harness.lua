@@ -126,6 +126,9 @@ _G.GameTooltip = {
   Hide = function() tooltipHidden = true end,
 }
 _G.GameTooltip_ShowCompareItem = function(tooltip) comparedTooltip = tooltip end
+-- Some clients include the profession itself as the first category ancestor.
+-- The UI should render it once as the profession header, not twice.
+product.recipes["recipe:1"].categoryPath = { "Alchemy", "Potions", "Healing" }
 local ui = GamersTrackerForever.UI:Create({ env = {
   time = function() return 2000 end,
   GetItemInfo = function() return "Test Reagent", nil, nil, nil, nil, nil, nil, nil, nil, 555 end,
@@ -137,6 +140,10 @@ same(ui.frame.h, 560, "native UI default height")
 same(ui.frame.backdrop.bgFile, "Interface\\Buttons\\WHITE8X8", "solid native backdrop keeps world and chat legible")
 assert(ui.characterSearch and ui.characterSearchClear and not ui.trackLimitDropdown,
   "left search replaces the tracking-limit dropdown")
+same(ui.leftPane.backdrop.edgeFile, "Interface\\Tooltips\\UI-Tooltip-Border",
+  "profession-like left panel has a distinct framed border")
+same(ui.searchIcon.texture, "Interface\\Common\\UI-Searchbox-Icon",
+  "search control has a native search icon")
 assert(not ui.tabs.characters and ui.tabs.recipes.text == "All Recipes"
   and ui.tabs.recipes.point[1] == "TOPLEFT", "redundant Characters tab is removed without a header gap")
 local sawMageIcon = false
@@ -185,6 +192,19 @@ assert(ui.expandedProfessions["ana|alchemy"] and ui.selectedProfessionKey == "al
   "profession expands beneath the selected character")
 assert(treeContains("Potions") and treeContains("Healing") and treeContains("Test Potion"),
   "native category hierarchy renders under the profession")
+local headerKinds, duplicateRoot = {}, false
+for _, row in ipairs(ui.rows or {}) do
+  if row.gtfStyle and row.gtfStyle ~= "plain" then
+    headerKinds[row.gtfStyle] = true
+    if row.gtfStyle ~= "recipe" then
+      assert(row.gtfBar and row.gtfExpander, "tree headers use full-width bars and right-side expanders")
+    end
+    if row.gtfStyle == "category" and row.gtfLabel.text == "Alchemy" then duplicateRoot = true end
+  end
+end
+assert(headerKinds.character and headerKinds.profession and headerKinds.category and headerKinds.recipe,
+  "character, profession, category, and recipe rows have distinct native-like styles")
+assert(not duplicateRoot, "category path does not repeat the profession root")
 local categoryKey = "ana|alchemy\031Potions"
 ui:ToggleCategory(categoryKey)
 assert(ui.expandedCategories[categoryKey] == false and treeContains("Potions")

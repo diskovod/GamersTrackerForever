@@ -1,9 +1,9 @@
-# GamersTrackerForever 0.3.0-beta.13 — Classic Era / Forever beta installation
+# GamersTrackerForever 0.3.0-beta.14 — Classic Era / Forever beta installation
 
 ## Install
 
 1. Close World of Warcraft.
-2. Extract `GamersTrackerForever-0.3.0-beta.13.zip` into the desired client so
+2. Extract `GamersTrackerForever-0.3.0-beta.14.zip` into the desired client so
    it creates exactly one of these folders:
    - `C:\Program Files (x86)\World of Warcraft\_classic_era_\Interface\AddOns\GamersTrackerForever\`
    - `C:\Program Files (x86)\World of Warcraft\_classic_beta_\Interface\AddOns\GamersTrackerForever\`
@@ -22,8 +22,9 @@
 - Use `/reload` after changing the addon files. The addon never forces a reload.
 - Every character that logs in with the addon is included automatically; there
   is no tracking limit or separate Characters tab. The left pane has a search
-  field and a Character → Profession → Category → Recipe tree. Expand a
-  character and profession to browse captured recipes, then select a recipe to
+  field and a Character → Profession → Category → Recipe tree styled like the
+  native profession list, with framed category bars and white recipe names.
+  Expand a character and profession to browse captured recipes, then select a recipe to
   see material icons and quantities on the right. Categories appear when the
   client exposes them; otherwise recipes are grouped as Uncategorized. The
   All Recipes button opens the cross-character recipe view. A separate panel
@@ -77,3 +78,5 @@ Material totals distinguish bags from bank, compatible transfer ecosystems from 
   Existing recipes appeared under Uncategorized because their saved snapshots
   predate category capture; category assignment after a fresh profession scan,
   left-search behavior, and the red-X hint still need live acceptance checks.
+- Beta.14 changes the left-pane presentation only. Its automated UI and SoD
+  checks pass; the updated styling still needs a visual check after `/reload`.

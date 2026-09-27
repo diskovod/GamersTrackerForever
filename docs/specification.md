@@ -1,8 +1,8 @@
 # GamersTrackerForever — Addon Specification
 
-**Version:** 1.1 (UI and automatic-tracking revision)
+**Version:** 1.2 (profession-list styling revision)
 
-**Status:** Implemented in 0.3.0-beta.13; client acceptance remains partial
+**Status:** Implemented in 0.3.0-beta.14; client acceptance remains partial
 
 **Updated:** 2026-09-27
 
@@ -473,14 +473,19 @@ are not available to WoW addons.
 
 ### 9.2 Main two-pane view
 
-There is no `Characters` tab. The left pane is always available and begins
-with a search field and clear control, followed by every locally discovered
+There is no `Characters` tab. The left pane is always available, has a darker
+framed background like the native profession list, and begins with a compact
+search field, icon, and clear control, followed by every locally discovered
 character. Each character row shows its full name, level, and a small class
 icon when a known class ID is saved. The row expands into profession headers
 with `rank/maxRank`, native recipe category headers, and learned recipe rows.
-Category and profession headers are collapsible. The currently selected recipe
-is visually distinct; unknown class icons and categories are omitted or use a
-plain uncategorized label rather than a guessed value. The left list scrolls
+Character, profession, and category headers use full-width brown/gold bars and
+right-aligned expand controls; recipe rows are compact with light text and a
+subtle selection highlight. A category root that merely repeats the profession
+name is suppressed. Category and profession headers are collapsible. The
+currently selected recipe is visually distinct; unknown class icons and
+categories are omitted or use a plain uncategorized label rather than a
+guessed value. The left list scrolls
 independently of the larger right detail pane.
 
 ```text
@@ -596,6 +601,9 @@ Responsibilities:
   persisted; missing category metadata does not block recipe capture.
 - The left tree shows Character > Profession > Category > Recipe, and a search
   match reveals its ancestors without permanently expanding them.
+- The left pane has a framed profession-list look: full-width character,
+  profession, and category headers with right-side expand controls, compact
+  light recipe rows, and no duplicate profession-name category root.
 - Reagents and quantities are stored by item ID.
 - Learning a recipe and reopening/updating the profession adds it.
 - Abandoning a profession updates the profession state without corrupting the catalog.

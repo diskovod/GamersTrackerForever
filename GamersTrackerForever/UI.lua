@@ -231,10 +231,15 @@ function UI:Initialize(dependencies)
   end
   recipesTab:SetScript("OnClick", function() self.tab = "recipes"; self:Refresh() end)
   self.body = CreateFrame("Frame", nil, frame); self.body:SetPoint("TOPLEFT", 10, -72); self.body:SetPoint("BOTTOMRIGHT", -10, 10)
-  self.leftPane = CreateFrame("Frame", nil, self.body); self.leftPane:SetPoint("TOPLEFT", 0, 0); self.leftPane:SetPoint("BOTTOMLEFT", 0, 0); self.leftPane:SetWidth(286)
-  self.leftTitle = label(self.leftPane, "GameFontNormal", "TOPLEFT", self.leftPane, 6, -4, 262, 20); self.leftTitle:SetText("Characters · Professions")
-  label(self.leftPane, "GameFontNormalSmall", "TOPLEFT", self.leftPane, 6, -30, 42, 20):SetText("Search")
-  self.characterSearch = editBox(self.leftPane, 190, 22); self.characterSearch:SetPoint("TOPLEFT", 49, -27)
+  local leftOK, leftFrame = pcall(CreateFrame, "Frame", nil, self.body, "BackdropTemplate")
+  self.leftPane = leftOK and leftFrame or CreateFrame("Frame", nil, self.body)
+  self.leftPane:SetPoint("TOPLEFT", 0, 0); self.leftPane:SetPoint("BOTTOMLEFT", 0, 0); self.leftPane:SetWidth(286)
+  createBackdrop(self.leftPane)
+  if type(self.leftPane.SetBackdropColor) == "function" then self.leftPane:SetBackdropColor(0.09, 0.075, 0.055, 0.96) end
+  self.searchIcon = self.leftPane:CreateTexture(nil, "ARTWORK")
+  self.searchIcon:SetSize(16, 16); self.searchIcon:SetPoint("TOPLEFT", self.leftPane, 9, -12)
+  self.searchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
+  self.characterSearch = editBox(self.leftPane, 219, 22); self.characterSearch:SetPoint("TOPLEFT", 29, -8)
   self.characterSearch:SetScript("OnTextChanged", function()
     if self.characterScroll and type(self.characterScroll.SetVerticalScroll) == "function" then
       self.characterScroll:SetVerticalScroll(0)
@@ -243,14 +248,14 @@ function UI:Initialize(dependencies)
   end)
   self.characterSearch:SetScript("OnEscapePressed", function(box) box:ClearFocus() end)
   self.characterSearchClear = button(self.leftPane, "X", 20, 22)
-  self.characterSearchClear:SetPoint("TOPLEFT", 244, -27)
+  self.characterSearchClear:SetPoint("TOPLEFT", 251, -8)
   self.characterSearchClear:SetScript("OnClick", function()
     self.characterSearch:SetText("")
     self.characterSearch:ClearFocus()
     self:RefreshCharacters(getProduct(self))
   end)
   self.characterScroll = CreateFrame("ScrollFrame", nil, self.leftPane, "UIPanelScrollFrameTemplate")
-  self.characterScroll:SetPoint("TOPLEFT", 2, -54); self.characterScroll:SetPoint("BOTTOMRIGHT", -16, 0)
+  self.characterScroll:SetPoint("TOPLEFT", 2, -40); self.characterScroll:SetPoint("BOTTOMRIGHT", -16, 2)
   self.characterContent = CreateFrame("Frame", nil, self.characterScroll); self.characterContent:SetSize(264, 1); self.characterScroll:SetScrollChild(self.characterContent)
   self.rightPane = CreateFrame("Frame", nil, self.body); self.rightPane:SetPoint("TOPLEFT", self.leftPane, "TOPRIGHT", 8, 0); self.rightPane:SetPoint("BOTTOMRIGHT", 0, 0)
   self.detailScroll = CreateFrame("ScrollFrame", nil, self.rightPane, "UIPanelScrollFrameTemplate"); self.detailScroll:SetPoint("TOPLEFT", 2, 0); self.detailScroll:SetPoint("BOTTOMRIGHT", -16, 0)
@@ -337,15 +342,43 @@ function UI:RefreshCharacters(productKey, product)
   if self.repository and self.repository.SetSelectedCharacterKey then self.repository:SetSelectedCharacterKey(selected) end
   self.trackedHeader:SetText(pane.header)
   local y, contentHeight = -4, 0
-  local function addTreeRow(caption, indent, height, onClick, font, selectedRow)
+  local function addTreeRow(caption, indent, height, onClick, font, selectedRow, style)
     height = height or 24
     local width = math.max(1, 262 - indent)
     if onClick then
       local row = CreateFrame("Button", nil, self.characterContent)
-      row:SetPoint("TOPLEFT", 2 + indent, y); row:SetSize(width, height)
-      local line = label(row, font or "GameFontNormalSmall", "LEFT", row, 3, 0, width - 4, height)
+      local header = style and style.kind ~= "recipe"
+      row:SetPoint("TOPLEFT", 2, y); row:SetSize(260, height)
+      row.gtfStyle = style and style.kind or "plain"
+      if header then
+        local bar = row:CreateTexture(nil, "BACKGROUND")
+        bar:SetTexture("Interface\\Buttons\\WHITE8X8")
+        bar:SetPoint("TOPLEFT", row, "TOPLEFT", 1, -2)
+        bar:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -1, 2)
+        if type(bar.SetVertexColor) == "function" then
+          if style.kind == "character" then bar:SetVertexColor(0.25, 0.17, 0.09, 0.9)
+          elseif style.kind == "profession" then bar:SetVertexColor(0.18, 0.13, 0.08, 0.9)
+          else bar:SetVertexColor(0.20, 0.13, 0.07, 0.92) end
+        end
+        row.gtfBar = bar
+        for _, edge in ipairs({ "TOP", "BOTTOM" }) do
+          local rule = row:CreateTexture(nil, "BORDER")
+          rule:SetTexture("Interface\\Buttons\\WHITE8X8")
+          rule:SetHeight(1)
+          rule:SetPoint(edge .. "LEFT", row, edge .. "LEFT", 1, edge == "TOP" and -1 or 1)
+          rule:SetPoint(edge .. "RIGHT", row, edge .. "RIGHT", -1, edge == "TOP" and -1 or 1)
+          if type(rule.SetVertexColor) == "function" then rule:SetVertexColor(0.55, 0.38, 0.15, 0.9) end
+        end
+      end
+      local line = label(row, font or "GameFontNormalSmall", "LEFT", row, 4 + indent, 0,
+        260 - indent - (header and 24 or 7), height)
       line:SetText(caption)
       row.gtfLabel = line
+      if header and style.expanded ~= nil then
+        local expander = label(row, "GameFontNormal", "RIGHT", row, -6, 0, 14, height)
+        expander:SetText(style.expanded and "−" or "+")
+        row.gtfExpander = expander
+      end
       if type(row.SetHighlightTexture) == "function" then
         row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
       end
@@ -360,7 +393,8 @@ function UI:RefreshCharacters(productKey, product)
       end
       row:SetScript("OnClick", onClick)
       self.rows[#self.rows + 1] = row
-      y = y - height - 2; contentHeight = contentHeight + height + 2
+      local gap = header and 3 or 0
+      y = y - height - gap; contentHeight = contentHeight + height + gap
       return row
     else
       local line = label(self.characterContent, font or "GameFontDisableSmall", "TOPLEFT", self.characterContent,
@@ -370,19 +404,29 @@ function UI:RefreshCharacters(productKey, product)
     end
     y = y - height - 2; contentHeight = contentHeight + height + 2
   end
-  local function recipePath(recipe)
+  local function recipePath(recipe, professionName)
     local path = {}
     for _, name in ipairs(recipe.categoryPath or {}) do
       if type(name) == "string" and name ~= "" then path[#path + 1] = name end
     end
-    if #path == 0 then path[1] = recipe.categoryName or "Uncategorized" end
+    -- Forever may include the profession itself as the category root. The
+    -- profession already has a header above this tree, so avoid repeating it.
+    if professionName and path[1] and string.lower(path[1]) == string.lower(professionName) then
+      table.remove(path, 1)
+    end
+    if #path == 0 then
+      local fallback = recipe.categoryName
+      if professionName and type(fallback) == "string"
+        and string.lower(fallback) == string.lower(professionName) then fallback = nil end
+      path[1] = fallback or "Uncategorized"
+    end
     return path
   end
-  local function groupedCategories(recipes)
+  local function groupedCategories(recipes, professionName)
     local root = { children = {}, childOrder = {}, recipes = {} }
     for _, recipe in ipairs(recipes) do
       local node = root
-      for _, name in ipairs(recipePath(recipe)) do
+      for _, name in ipairs(recipePath(recipe, professionName)) do
         if not node.children[name] then
           node.children[name] = { name = name, children = {}, childOrder = {}, recipes = {}, count = 0 }
           node.childOrder[#node.childOrder + 1] = name
@@ -404,18 +448,18 @@ function UI:RefreshCharacters(productKey, product)
       local category = node.children[name]
       local categoryKey = pathKey .. "\031" .. name
       local expanded = searching or self.expandedCategories[categoryKey] ~= false
-      local indent = math.min(35 + (depth - 1) * 12, 78)
-      addTreeRow((expanded and "v " or "> ") .. name .. " (" .. tostring(category.count) .. ")",
-        indent, 26, function() self:ToggleCategory(categoryKey) end, "GameFontNormal")
+      local indent = math.min(19 + (depth - 1) * 10, 54)
+      addTreeRow(name, indent, 27, function() self:ToggleCategory(categoryKey) end,
+        "GameFontNormal", false, { kind = "category", expanded = expanded })
       if expanded then
         for _, recipe in ipairs(category.recipes) do
           local selectedRecipe = tostring(self.selectedRecipeKey or "") == tostring(recipe.key)
           local definition = product.recipes and product.recipes[recipe.key]
-          local recipeRow = addTreeRow((selectedRecipe and "• " or "  ") .. recipe.name
-            .. wearabilityMarker(self, definition),
-            math.min(indent + 15, 93), 25,
+          local recipeRow = addTreeRow(recipe.name .. wearabilityMarker(self, definition),
+            math.min(indent + 14, 72), 24,
             function() self:SelectRecipe(character.key, profession.key, recipe.key) end,
-            selectedRecipe and "GameFontHighlight" or "GameFontNormalSmall", selectedRecipe)
+            selectedRecipe and "GameFontHighlight" or "GameFontHighlightSmall", selectedRecipe,
+            { kind = "recipe" })
           attachItemTooltip(self, recipeRow, definition and definition.outputItemID,
             definition and definition.outputItemLink)
         end
@@ -433,7 +477,7 @@ function UI:RefreshCharacters(productKey, product)
       for _, recipe in ipairs(profession.recipes or {}) do
         local categoryMatches = false
         if searching then
-          for _, categoryName in ipairs(recipePath(recipe)) do
+          for _, categoryName in ipairs(recipePath(recipe, profession.name)) do
             if matches(categoryName) then categoryMatches = true; break end
           end
         end
@@ -448,15 +492,15 @@ function UI:RefreshCharacters(productKey, product)
     if not searching or characterMatches or #visibleProfessions > 0 then
     visibleCharacters = visibleCharacters + 1
     local isSelected = tostring(model.key) == tostring(selected)
-    local marker = isSelected and "v " or "> "
-    local characterRow = addTreeRow(marker .. model.name .. "  L" .. tostring(model.level), 0, 30,
-      function() self:SelectCharacter(model.key) end, "GameFontHighlight", isSelected)
+    local characterRow = addTreeRow(model.name .. "  L" .. tostring(model.level), 7, 29,
+      function() self:SelectCharacter(model.key) end, "GameFontHighlight", isSelected,
+      { kind = "character", expanded = isSelected or searching })
     if GTF.ClassIcons and type(GTF.ClassIcons.Apply) == "function" then
       local classIcon = characterRow:CreateTexture(nil, "ARTWORK")
       classIcon:SetSize(17, 17)
-      classIcon:SetPoint("RIGHT", characterRow, "RIGHT", -4, 0)
+      classIcon:SetPoint("RIGHT", characterRow, "RIGHT", -23, 0)
       if GTF.ClassIcons.Apply(classIcon, model.classID, model.className) then
-        characterRow.gtfLabel:SetWidth(characterRow:GetWidth() - 24)
+        characterRow.gtfLabel:SetWidth(characterRow:GetWidth() - 54)
       end
       characterRow.classIcon = classIcon
     end
@@ -470,16 +514,17 @@ function UI:RefreshCharacters(productKey, product)
           local profession = entry.model
           local treeKey = tostring(model.key) .. "|" .. tostring(profession.key)
           local expanded = searching or self.expandedProfessions[treeKey] == true
-          addTreeRow((expanded and "v " or "> ") .. profession.name .. " " .. tostring(profession.rank)
-            .. "/" .. tostring(profession.maxRank), 16, 27,
-            function() self:ToggleProfession(model.key, profession.key) end, "GameFontNormal")
+          addTreeRow(profession.name .. " " .. tostring(profession.rank)
+            .. "/" .. tostring(profession.maxRank), 13, 27,
+            function() self:ToggleProfession(model.key, profession.key) end, "GameFontNormal",
+            false, { kind = "profession", expanded = expanded })
           if expanded then
             if not self.recipesSupported then
               addTreeRow("Recipes pending", 27)
             elseif #entry.recipes == 0 then
               addTreeRow("No recipes captured yet", 27)
             else
-              drawCategories(model, profession, groupedCategories(entry.recipes), treeKey, 1)
+              drawCategories(model, profession, groupedCategories(entry.recipes, profession.name), treeKey, 1)
             end
           end
         end
